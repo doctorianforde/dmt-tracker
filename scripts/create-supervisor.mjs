@@ -17,9 +17,9 @@ const firebaseConfig = {
 // ── Edit these before running ─────────────────────────────────────
 const ACCOUNT = {
   name: 'Test Supervisor',
-  email: 'supervisor@test.com',
+  email: 'drpaul@test.com',
   password: 'TestSuper123!',
-  role: 'supervisor1',   // supervisor1 | supervisor2 | drpaul
+  role: 'drpaul',   // supervisor1 | supervisor2 | drpaul
 };
 // ─────────────────────────────────────────────────────────────────
 

@@ -1,0 +1,109 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/lib/auth-context';
+import AuthGuard from '@/components/AuthGuard';
+import Navbar from '@/components/Navbar';
+import CaseTable from '@/components/CaseTable';
+import { getAllCases, updateGreenLight } from '@/lib/firestore';
+import type { CaseRecord } from '@/types';
+
+const SUPERVISOR_ROLES = ['supervisor1', 'supervisor2', 'drpaul'] as const;
+
+export default function SupervisorDashboard() {
+  return (
+    <AuthGuard allowedRoles={[...SUPERVISOR_ROLES]}>
+      <Dashboard />
+    </AuthGuard>
+  );
+}
+
+function Dashboard() {
+  const { userProfile } = useAuth();
+  const [cases, setCases] = useState<CaseRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  const loadCases = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getAllCases();
+      setCases(data.sort((a, b) => a.studentName.localeCompare(b.studentName)));
+      setLastRefresh(new Date());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadCases(); }, [loadCases]);
+
+  const handleGreenLight = async (caseNumber: string, value: boolean) => {
+    await updateGreenLight(caseNumber, value);
+    setCases((prev) =>
+      prev.map((c) => (c.caseNumber === caseNumber ? { ...c, greenLight: value } : c))
+    );
+  };
+
+  const ROLE_TITLE: Record<string, string> = {
+    supervisor1: 'Supervisor 1',
+    supervisor2: 'Supervisor 2',
+    drpaul: 'Dr. Paul — Lead Supervisor',
+  };
+
+  const isDrPaul = userProfile?.role === 'drpaul';
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <Navbar />
+      <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Supervisor Dashboard</h1>
+            <p className="text-slate-500 text-sm mt-1">
+              {ROLE_TITLE[userProfile?.role ?? 'supervisor1']} · All student case records
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {lastRefresh && (
+              <p className="text-xs text-slate-400 hidden sm:block">
+                Updated {lastRefresh.toLocaleTimeString()}
+              </p>
+            )}
+            <button
+              onClick={loadCases}
+              disabled={loading}
+              className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 px-4 py-2 border border-slate-200 rounded-xl hover:bg-white transition-colors bg-white/50 disabled:opacity-50"
+            >
+              <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {isDrPaul && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3.5 flex items-center gap-3">
+            <span className="text-emerald-600">✅</span>
+            <p className="text-sm text-emerald-800">
+              <span className="font-semibold">Green Light mode active.</span>{' '}
+              You can approve or revoke submissions for any student case below.
+            </p>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-slate-400 text-sm">Loading case records...</p>
+            </div>
+          </div>
+        ) : (
+          <CaseTable cases={cases} isDrPaul={isDrPaul} onGreenLight={handleGreenLight} />
+        )}
+      </main>
+    </div>
+  );
+}

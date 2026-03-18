@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSupervisor() {
+      return isAuthed() && userDoc().role in ['supervisor1', 'supervisor2', 'drpaul'];
+    }
+
+    function isStudent() {
+      return isAuthed() && userDoc().role == 'student';
+    }
+
+    function isDrPaul() {
+      return isAuthed() && userDoc().role == 'drpaul';
+    }
+
+    // ── Users ────────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId || isSupervisor();
+
+      allow create: if request.auth.uid == userId
+        && request.resource.data.role in ['student', 'supervisor1', 'supervisor2', 'drpaul'];
+
+      // Users can update their own profile but cannot change their role
+      allow update: if request.auth.uid == userId
+        && !('role' in request.resource.data.diff(resource.data).affectedKeys());
+    }
+
+    // ── Cases ────────────────────────────────────────────────────────────────
+    match /cases/{caseNumber} {
+      // Students read their own case (matched via studentUid); supervisors read all
+      allow read: if isSupervisor()
+        || (isStudent() && resource.data.studentUid == request.auth.uid);
+
+      // Students create a case — ownership proven by studentUid in the new document
+      allow create: if isStudent()
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.greenLight == false;
+
+      // Students update their own case but cannot touch greenLight
+      allow update: if
+        (isStudent()
+          && resource.data.studentUid == request.auth.uid
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['greenLight']))
+        ||
+        // Dr. Paul can only flip greenLight (and updatedAt timestamp)
+        (isDrPaul()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['greenLight', 'updatedAt']));
+    }
+  }
+}

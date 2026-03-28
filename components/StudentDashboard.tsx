@@ -161,7 +161,7 @@ function Dashboard() {
 
   return (
     <div className={`min-h-screen ${themeConfig.pageBg}`}>
-      <Navbar />
+      <Navbar variant={themeConfig.navVariant} />
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
 
         {/* Header */}
@@ -187,13 +187,11 @@ function Dashboard() {
                   key={t}
                   onClick={() => setTheme(t)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm font-medium transition-all
-                    ${theme === t
-                      ? `border-current ${themeConfig.button.split(' ')[0].replace('bg-', 'text-').replace('-600', '-600')} bg-opacity-10 border-opacity-60`
-                      : `border-slate-200 ${themeConfig.bodyText} hover:border-slate-300`
-                    }`}
+                    ${theme === t ? tc.themeButtonActive : tc.themeButtonInactive}`}
                 >
                   <span>{tc.emoji}</span>
                   <span>{tc.name}</span>
+                  {theme === t && <span className="ml-0.5 text-xs">✓</span>}
                 </button>
               );
             })}

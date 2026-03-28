@@ -1,5 +1,9 @@
 export type UserRole = 'student' | 'supervisor1' | 'supervisor2' | 'drpaul';
 
+export type ApprovalStage = 'pending' | 'supervisor1' | 'supervisor2' | 'drpaul' | 'approved';
+
+export type ThemeChoice = 'light' | 'dark' | 'feminine' | 'pastel' | 'sports';
+
 export interface UserProfile {
   uid: string;
   name: string;
@@ -8,6 +12,7 @@ export interface UserProfile {
   caseNumber?: string;
   startYear?: number;
   classYear?: number;
+  theme?: ThemeChoice;
 }
 
 export interface CaseSections {
@@ -15,6 +20,7 @@ export interface CaseSections {
   caseReport: boolean;
   discussion: boolean;
   conclusion: boolean;
+  references: boolean;
 }
 
 export interface CaseRecord {
@@ -25,7 +31,10 @@ export interface CaseRecord {
   classYear: number;
   sections: CaseSections;
   submitted: boolean;
-  documentLink?: string;   // Google Drive / OneDrive / Dropbox share link
+  documentLink?: string;
   greenLight: boolean;
+  approvalStage?: ApprovalStage;
+  customDeadline?: string;   // ISO date string e.g. "2026-06-30"
+  extensionReason?: string;  // accountability note when deadline can't be met
   updatedAt?: Date | null;
 }

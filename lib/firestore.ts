@@ -54,6 +54,17 @@ export async function updateGreenLight(caseNumber: string, value: boolean): Prom
   });
 }
 
+export async function updateApprovalStage(
+  caseNumber: string,
+  stage: import('@/types').ApprovalStage
+): Promise<void> {
+  await updateDoc(doc(db, 'cases', caseNumber), {
+    approvalStage: stage,
+    greenLight: stage === 'approved',
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function getAllCases(): Promise<CaseRecord[]> {
   const snap = await getDocs(collection(db, 'cases'));
   return snap.docs.map((d) => {

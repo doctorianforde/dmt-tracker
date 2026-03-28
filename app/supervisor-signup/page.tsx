@@ -87,9 +87,9 @@ export default function SupervisorSignupPage() {
         <div>
           <div className="flex items-center gap-3 mb-14">
             <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center">
-              <span className="text-white text-sm font-bold">DMT</span>
+              <span className="text-white text-sm font-bold">VIS</span>
             </div>
-            <span className="text-white/90 font-semibold text-lg">Case Tracker</span>
+            <span className="text-white/90 font-semibold text-lg">VIS System</span>
           </div>
 
           <h2 className="text-4xl font-bold text-white leading-tight mb-5">
@@ -128,9 +128,9 @@ export default function SupervisorSignupPage() {
           {/* Mobile logo */}
           <div className="flex items-center gap-2 mb-8 lg:hidden">
             <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xs font-bold">DMT</span>
+              <span className="text-white text-xs font-bold">VIS</span>
             </div>
-            <span className="font-semibold text-slate-800">Case Tracker</span>
+            <span className="font-semibold text-slate-800">VIS System</span>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">

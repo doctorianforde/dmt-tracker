@@ -31,11 +31,11 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center shadow-sm">
-            <span className="text-white text-xs font-bold">DMT</span>
+            <span className="text-white text-xs font-bold">VIS</span>
           </div>
           <div>
-            <p className="font-semibold text-slate-900 text-sm leading-none">DM Emergency Medicine</p>
-            <p className="text-xs text-slate-400 leading-none mt-0.5">Case Report Portal</p>
+            <p className="font-semibold text-slate-900 text-sm leading-none">VIS System</p>
+            <p className="text-xs text-slate-400 leading-none mt-0.5">Verified Insight System</p>
           </div>
         </div>
 

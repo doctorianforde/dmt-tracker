@@ -57,30 +57,31 @@ export default function LoginPage() {
         <div>
           <div className="flex items-center gap-3 mb-14">
             <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center">
-              <span className="text-white text-sm font-bold">DMT</span>
+              <span className="text-white text-sm font-bold">VIS</span>
             </div>
-            <span className="text-white/90 font-semibold text-lg">Case Tracker</span>
+            <span className="text-white/90 font-semibold text-lg">VIS System</span>
           </div>
 
           <h2 className="text-4xl font-bold text-white leading-tight mb-5">
-            DM Emergency
+            Verified
             <br />
-            Medicine
+            Insight
             <br />
-            <span className="text-sky-300">Case Report Portal</span>
+            <span className="text-sky-300">System</span>
           </h2>
           <p className="text-sky-200 text-base leading-relaxed max-w-sm">
-            Track your DM case report progress, collaborate with supervisors, and manage
-            submissions — all in one place.
+            Track your case report progress, collaborate with supervisors, and stay on schedule
+            — all in one place.
           </p>
         </div>
 
         <div className="space-y-3">
           {[
-            { icon: '📋', text: 'Track all four case report sections' },
-            { icon: '📎', text: 'Upload and manage your case document' },
-            { icon: '✅', text: 'Receive Dr. Paul\'s green light approval' },
-            { icon: '📅', text: 'Submission deadline: June 2026' },
+            { icon: '📋', text: 'Track all five case report sections' },
+            { icon: '🎨', text: 'Choose your own dashboard theme' },
+            { icon: '🟠', text: 'Color-coded approval pipeline' },
+            { icon: '⏰', text: 'Deadline reminders & accountability tools' },
+            { icon: '✅', text: 'Receive Dr. Paul\'s final approval' },
           ].map(({ icon, text }) => (
             <div key={text} className="flex items-center gap-3 text-sky-100/80">
               <span>{icon}</span>
@@ -96,9 +97,9 @@ export default function LoginPage() {
           {/* Mobile logo */}
           <div className="flex items-center gap-2 mb-8 lg:hidden">
             <div className="w-8 h-8 bg-sky-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xs font-bold">DMT</span>
+              <span className="text-white text-xs font-bold">VIS</span>
             </div>
-            <span className="font-semibold text-slate-800">Case Tracker</span>
+            <span className="font-semibold text-slate-800">VIS System</span>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
@@ -108,8 +109,8 @@ export default function LoginPage() {
               </h1>
               <p className="text-slate-500 text-sm mt-1">
                 {isSignUp
-                  ? 'Register as a new DMT student'
-                  : 'Sign in to your portal account'}
+                  ? 'Register as a new VIS student'
+                  : 'Sign in to your VIS account'}
               </p>
             </div>
 

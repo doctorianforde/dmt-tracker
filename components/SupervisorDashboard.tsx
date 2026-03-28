@@ -5,8 +5,8 @@ import { useAuth } from '@/lib/auth-context';
 import AuthGuard from '@/components/AuthGuard';
 import Navbar from '@/components/Navbar';
 import CaseTable from '@/components/CaseTable';
-import { getAllCases, updateGreenLight } from '@/lib/firestore';
-import type { CaseRecord } from '@/types';
+import { getAllCases, updateGreenLight, updateApprovalStage } from '@/lib/firestore';
+import type { CaseRecord, ApprovalStage } from '@/types';
 
 const SUPERVISOR_ROLES = ['supervisor1', 'supervisor2', 'drpaul'] as const;
 
@@ -40,7 +40,16 @@ function Dashboard() {
   const handleGreenLight = async (caseNumber: string, value: boolean) => {
     await updateGreenLight(caseNumber, value);
     setCases((prev) =>
-      prev.map((c) => (c.caseNumber === caseNumber ? { ...c, greenLight: value } : c))
+      prev.map((c) => (c.caseNumber === caseNumber ? { ...c, greenLight: value, approvalStage: value ? 'approved' : 'drpaul' } : c))
+    );
+  };
+
+  const handleStageAdvance = async (caseNumber: string, stage: ApprovalStage) => {
+    await updateApprovalStage(caseNumber, stage);
+    setCases((prev) =>
+      prev.map((c) => (c.caseNumber === caseNumber
+        ? { ...c, approvalStage: stage, greenLight: stage === 'approved' }
+        : c))
     );
   };
 
@@ -51,6 +60,9 @@ function Dashboard() {
   };
 
   const isDrPaul = userProfile?.role === 'drpaul';
+  const supervisorRole = (userProfile?.role === 'supervisor1' || userProfile?.role === 'supervisor2')
+    ? userProfile.role
+    : undefined;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -83,15 +95,53 @@ function Dashboard() {
           </div>
         </div>
 
+        {/* Role info banners */}
         {isDrPaul && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3.5 flex items-center gap-3">
             <span className="text-emerald-600">✅</span>
             <p className="text-sm text-emerald-800">
-              <span className="font-semibold">Green Light mode active.</span>{' '}
-              You can approve or revoke submissions for any student case below.
+              <span className="font-semibold">Dr. Paul mode active.</span>{' '}
+              You can approve or revoke case submissions and advance cases through all stages.
             </p>
           </div>
         )}
+        {userProfile?.role === 'supervisor1' && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl px-5 py-3.5 flex items-center gap-3">
+            <span className="text-orange-500">🟠</span>
+            <p className="text-sm text-orange-800">
+              <span className="font-semibold">Supervisor 1.</span>{' '}
+              You can accept cases for review and forward them to Supervisor 2.
+            </p>
+          </div>
+        )}
+        {userProfile?.role === 'supervisor2' && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3.5 flex items-center gap-3">
+            <span className="text-amber-500">🟡</span>
+            <p className="text-sm text-amber-800">
+              <span className="font-semibold">Supervisor 2.</span>{' '}
+              You can forward reviewed cases to Dr. Paul.
+            </p>
+          </div>
+        )}
+
+        {/* Approval stage legend */}
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Approval Pipeline</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {[
+              { color: 'bg-slate-300', label: 'Pending' },
+              { color: 'bg-orange-400', label: 'Supervisor 1' },
+              { color: 'bg-amber-400', label: 'Supervisor 2' },
+              { color: 'bg-yellow-300', label: 'Dr. Paul' },
+              { color: 'bg-emerald-500', label: 'Approved' },
+            ].map(({ color, label }) => (
+              <div key={label} className="flex items-center gap-1.5 text-xs text-slate-600">
+                <span className={`w-3 h-3 rounded-full ${color}`} />
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
@@ -101,7 +151,13 @@ function Dashboard() {
             </div>
           </div>
         ) : (
-          <CaseTable cases={cases} isDrPaul={isDrPaul} onGreenLight={handleGreenLight} />
+          <CaseTable
+            cases={cases}
+            isDrPaul={isDrPaul}
+            supervisorRole={supervisorRole}
+            onGreenLight={handleGreenLight}
+            onStageAdvance={handleStageAdvance}
+          />
         )}
       </main>
     </div>

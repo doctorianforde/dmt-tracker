@@ -58,7 +58,6 @@ function Dashboard() {
   const [classYear, setClassYear] = useState(1);
   const [customDeadline, setCustomDeadline] = useState('');
   const [sections, setSections] = useState<CaseSections>(DEFAULT_SECTIONS);
-  const [documentLink, setDocumentLink] = useState('');
   const [extensionReason, setExtensionReason] = useState('');
   const [showExtension, setShowExtension] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>('light');
@@ -78,7 +77,6 @@ function Dashboard() {
         if (rec) {
           setCaseRecord(rec);
           setSections(rec.sections ?? DEFAULT_SECTIONS);
-          setDocumentLink(rec.documentLink ?? '');
           setCustomDeadline(rec.customDeadline ?? '');
           setExtensionReason(rec.extensionReason ?? '');
         }
@@ -104,8 +102,7 @@ function Dashboard() {
         startYear,
         classYear,
         sections,
-        submitted: !!documentLink.trim(),
-        documentLink: documentLink.trim() || undefined,
+        submitted: false,
         greenLight: caseRecord?.greenLight ?? false,
         approvalStage: caseRecord?.approvalStage ?? 'pending',
         customDeadline: customDeadline || undefined,
@@ -325,46 +322,6 @@ function Dashboard() {
             <span className={`text-sm tabular-nums font-semibold ${themeConfig.mutedText}`}>{completedCount} / 5</span>
           </div>
           <ProgressChecklist sections={sections} onChange={setSections} theme={themeConfig} />
-        </div>
-
-        {/* Document Submission */}
-        <div className={`${themeConfig.cardBg} rounded-2xl border ${themeConfig.cardBorder} p-6 space-y-4`}>
-          <div>
-            <h2 className={`font-bold ${themeConfig.headingColor}`}>Case Document</h2>
-            <p className={`text-xs mt-0.5 ${themeConfig.mutedText}`}>
-              Paste a shared Google Drive, OneDrive, or Dropbox link to your case document
-            </p>
-          </div>
-
-          <div>
-            <label className={labelClass}>Document Share Link</label>
-            <input
-              type="url"
-              value={documentLink}
-              onChange={(e) => setDocumentLink(e.target.value)}
-              placeholder="https://docs.google.com/... or https://onedrive.live.com/..."
-              className={inputClass}
-            />
-          </div>
-
-          {documentLink && (
-            <a
-              href={documentLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-sky-600 hover:text-sky-800 font-medium"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              Preview link →
-            </a>
-          )}
-
-          <div className={`border ${themeConfig.cardBorder} ${themeConfig.inputBg} rounded-xl p-3 text-xs ${themeConfig.mutedText} space-y-1`}>
-            <p className={`font-semibold ${themeConfig.bodyText}`}>How to share from Google Docs:</p>
-            <p>File → Share → Copy link → set access to &quot;Anyone with the link&quot;</p>
-          </div>
         </div>
 
         {/* Accountability Section */}

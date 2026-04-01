@@ -46,8 +46,7 @@ export default function Navbar({ variant = 'light' }: NavbarProps) {
             <span className="text-white text-xs font-bold">VIS</span>
           </div>
           <div>
-            <p className={`font-semibold text-sm leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>VIS System</p>
-            <p className={`text-xs leading-none mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>Verified Insight System</p>
+            <p className={`font-semibold text-sm leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>VIS</p>
           </div>
         </div>
 

@@ -59,15 +59,11 @@ export default function LoginPage() {
             <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center">
               <span className="text-white text-sm font-bold">VIS</span>
             </div>
-            <span className="text-white/90 font-semibold text-lg">VIS System</span>
+            <span className="text-white/90 font-semibold text-lg">VIS</span>
           </div>
 
-          <h2 className="text-4xl font-bold text-white leading-tight mb-5">
-            Verified
-            <br />
-            Insight
-            <br />
-            <span className="text-sky-300">System</span>
+          <h2 className="text-5xl font-bold text-white leading-tight mb-5">
+            VIS
           </h2>
           <p className="text-sky-200 text-base leading-relaxed max-w-sm">
             Track your case report progress, collaborate with supervisors, and stay on schedule
@@ -99,7 +95,7 @@ export default function LoginPage() {
             <div className="w-8 h-8 bg-sky-600 rounded-lg flex items-center justify-center">
               <span className="text-white text-xs font-bold">VIS</span>
             </div>
-            <span className="font-semibold text-slate-800">VIS System</span>
+            <span className="font-semibold text-slate-800">VIS</span>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">

@@ -34,7 +34,9 @@ export interface CaseRecord {
   documentLink?: string;
   greenLight: boolean;
   approvalStage?: ApprovalStage;
-  customDeadline?: string;   // ISO date string e.g. "2026-06-30"
-  extensionReason?: string;  // accountability note when deadline can't be met
+  supervisor1Name?: string;
+  supervisor2Name?: string;
+  customDeadline?: string;
+  extensionReason?: string;
   updatedAt?: Date | null;
 }

@@ -37,6 +37,27 @@ const PIPELINE_STEPS: { stage: ApprovalStage; label: string; color: string }[] =
   { stage: 'approved', label: 'Approved', color: 'bg-emerald-500' },
 ];
 
+export const SUPERVISORS = [
+  'Dr. Davin Powdhar',
+  'Dr. Windale',
+  'Dr. Jenna',
+  'Dr. Sally',
+  'Dr. Kyle',
+  'Dr. Ian',
+  'Dr. Sammy',
+  'Dr. Saleem Varachhia',
+  'Dr. Arvind Ramnarine',
+  'Dr. Jason Ettienne',
+  'Dr. Latoya Baptiste-Manzano',
+  'Dr. Zada',
+  'Dr. Saif',
+  'Dr. Steve',
+  'Dr. Robert',
+  'Dr. Emerald',
+  'Dr. Romel',
+  'Dr. Sunita',
+];
+
 export default function StudentDashboard() {
   return (
     <AuthGuard allowedRoles={['student']}>
@@ -58,6 +79,8 @@ function Dashboard() {
   const [classYear, setClassYear] = useState(1);
   const [customDeadline, setCustomDeadline] = useState('');
   const [sections, setSections] = useState<CaseSections>(DEFAULT_SECTIONS);
+  const [supervisor1Name, setSupervisor1Name] = useState('');
+  const [supervisor2Name, setSupervisor2Name] = useState('');
   const [extensionReason, setExtensionReason] = useState('');
   const [showExtension, setShowExtension] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>('light');
@@ -77,6 +100,8 @@ function Dashboard() {
         if (rec) {
           setCaseRecord(rec);
           setSections(rec.sections ?? DEFAULT_SECTIONS);
+          setSupervisor1Name(rec.supervisor1Name ?? '');
+          setSupervisor2Name(rec.supervisor2Name ?? '');
           setCustomDeadline(rec.customDeadline ?? '');
           setExtensionReason(rec.extensionReason ?? '');
         }
@@ -105,6 +130,8 @@ function Dashboard() {
         submitted: false,
         greenLight: caseRecord?.greenLight ?? false,
         approvalStage: caseRecord?.approvalStage ?? 'pending',
+        ...(supervisor1Name ? { supervisor1Name } : {}),
+        ...(supervisor2Name ? { supervisor2Name } : {}),
         ...(customDeadline ? { customDeadline } : {}),
         ...(extensionReason.trim() ? { extensionReason: extensionReason.trim() } : {}),
       };
@@ -216,7 +243,11 @@ function Dashboard() {
                       {isReached || isCurrent ? '✓' : i + 1}
                     </div>
                     <p className={`text-xs mt-1 text-center leading-tight max-w-[60px] ${isCurrent ? themeConfig.headingColor : themeConfig.mutedText}`}>
-                      {step.label}
+                      {step.stage === 'supervisor1' && supervisor1Name
+                        ? supervisor1Name
+                        : step.stage === 'supervisor2' && supervisor2Name
+                        ? supervisor2Name
+                        : step.label}
                     </p>
                   </div>
                   {i < PIPELINE_STEPS.length - 1 && (
@@ -304,6 +335,32 @@ function Dashboard() {
               <p className={`text-xs mt-1.5 ${themeConfig.mutedText}`}>
                 Leave blank to use the default deadline (June 30, 2026)
               </p>
+            </div>
+            <div>
+              <label className={labelClass}>Supervisor 1</label>
+              <select
+                value={supervisor1Name}
+                onChange={(e) => setSupervisor1Name(e.target.value)}
+                className={`${inputClass} ${themeConfig.selectBg}`}
+              >
+                <option value="">— Select supervisor —</option>
+                {SUPERVISORS.filter((s) => s !== supervisor2Name).map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Supervisor 2</label>
+              <select
+                value={supervisor2Name}
+                onChange={(e) => setSupervisor2Name(e.target.value)}
+                className={`${inputClass} ${themeConfig.selectBg}`}
+              >
+                <option value="">— Select supervisor —</option>
+                {SUPERVISORS.filter((s) => s !== supervisor1Name).map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>

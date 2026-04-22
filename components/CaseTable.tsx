@@ -22,8 +22,8 @@ const SECTION_LABELS: Record<string, string> = {
 
 const STAGE_CONFIG: Record<ApprovalStage, { label: string; color: string; dot: string }> = {
   pending: { label: 'Pending', color: 'bg-slate-100 text-slate-500', dot: 'bg-slate-300' },
-  supervisor1: { label: 'Supervisor 1', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-400' },
-  supervisor2: { label: 'Supervisor 2', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-400' },
+  supervisor1: { label: 'Sup. 1', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-400' },
+  supervisor2: { label: 'Sup. 2', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-400' },
   drpaul: { label: 'Dr. Paul', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-400' },
   approved: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
 };
@@ -63,7 +63,7 @@ export default function CaseTable({ cases, isDrPaul = false, supervisorRole, onG
   const totalComplete = cases.filter((c) =>
     Object.values(c.sections).every(Boolean)
   ).length;
-  const totalSubmitted = cases.filter((c) => c.documentLink).length;
+  const totalSubmitted = cases.filter((c) => c.submitted).length;
   const totalGreenLights = cases.filter((c) => c.greenLight).length;
 
   if (cases.length === 0) {
@@ -125,7 +125,6 @@ export default function CaseTable({ cases, isDrPaul = false, supervisorRole, onG
                 <th className="text-left px-4 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Case #</th>
                 <th className="text-left px-4 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden sm:table-cell">Year</th>
                 <th className="text-center px-4 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Sections</th>
-                <th className="text-center px-4 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden md:table-cell">Document</th>
                 <th className="text-center px-4 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Stage</th>
                 {(supervisorRole || isDrPaul) && (
                   <th className="text-center px-4 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Action</th>
@@ -144,6 +143,11 @@ export default function CaseTable({ cases, isDrPaul = false, supervisorRole, onG
                   <tr key={rec.caseNumber} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-5 py-4">
                       <p className="font-semibold text-slate-900">{rec.studentName}</p>
+                      {(rec.supervisor1Name || rec.supervisor2Name) && (
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {[rec.supervisor1Name, rec.supervisor2Name].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-4">
                       <span className="font-mono text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded">
@@ -171,27 +175,14 @@ export default function CaseTable({ cases, isDrPaul = false, supervisorRole, onG
                         <span className="text-xs text-slate-400">{completedCount}/5</span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-center hidden md:table-cell">
-                      {rec.documentLink ? (
-                        <a
-                          href={rec.documentLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-sky-600 hover:text-sky-800 font-medium"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                          Open
-                        </a>
-                      ) : (
-                        <span className="text-xs text-slate-300">—</span>
-                      )}
-                    </td>
                     <td className="px-4 py-4 text-center">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${stageStyle.color}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${stageStyle.dot}`} />
-                        {stageStyle.label}
+                        {stage === 'supervisor1' && rec.supervisor1Name
+                          ? rec.supervisor1Name
+                          : stage === 'supervisor2' && rec.supervisor2Name
+                          ? rec.supervisor2Name
+                          : stageStyle.label}
                       </span>
                     </td>
                     {(supervisorRole || isDrPaul) && (

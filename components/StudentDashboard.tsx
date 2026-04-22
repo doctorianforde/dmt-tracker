@@ -105,8 +105,8 @@ function Dashboard() {
         submitted: false,
         greenLight: caseRecord?.greenLight ?? false,
         approvalStage: caseRecord?.approvalStage ?? 'pending',
-        customDeadline: customDeadline || undefined,
-        extensionReason: extensionReason.trim() || undefined,
+        ...(customDeadline ? { customDeadline } : {}),
+        ...(extensionReason.trim() ? { extensionReason: extensionReason.trim() } : {}),
       };
 
       await saveCaseRecord(caseNumber.trim(), payload);

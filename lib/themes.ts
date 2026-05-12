@@ -1,37 +1,46 @@
-import type { ThemeChoice } from '@/types';
+import type { ThemeChoice, ThemeConfig, ThemeMarkers } from '@/types';
 
-export interface ThemeConfig {
-  name: string;
-  emoji: string;
-  navVariant: 'light' | 'dark';
-  pageBg: string;
-  cardBg: string;
-  cardBorder: string;
-  headingColor: string;
-  bodyText: string;
-  mutedText: string;
-  button: string;
-  progressGradient: string;
-  progressTrack: string;
-  sectionCheckedBg: string;
-  sectionCheckedBorder: string;
-  sectionCheckedText: string;
-  sectionUncheckedBg: string;
-  sectionUncheckedBorder: string;
-  checkboxActiveBg: string;
-  checkboxActiveBorder: string;
-  checkboxInactiveBg: string;
-  checkboxInactiveBorder: string;
-  inputBg: string;
-  inputBorder: string;
-  inputFocus: string;
-  inputText: string;
-  labelColor: string;
-  selectBg: string;
-  themeButtonActive: string;
-  themeButtonInactive: string;
-}
+// Theme-specific marker symbols/colors
+export const THEME_MARKERS: Record<ThemeChoice, ThemeMarkers> = {
+  light: {
+    pending: '○',
+    inProgress: '◑',
+    completed: '●',
+    approved: '✅',
+  },
+  flower: {
+    pending: '🌱',
+    inProgress: '🌿',
+    completed: '🌸',
+    approved: '💐',
+  },
+  pastel: {
+    pending: '○',
+    inProgress: '◑',
+    completed: '●',
+    approved: '✅',
+  },
+  sports: {
+    pending: '◇',
+    inProgress: '◈',
+    completed: '◆',
+    approved: '⭐',
+  },
+  dark: {
+    pending: '◇',
+    inProgress: '◈',
+    completed: '◆',
+    approved: '⭐',
+  },
+  mario: {
+    pending: '🧱',
+    inProgress: '❓',
+    completed: '🍄',
+    approved: '🌟',
+  },
+};
 
+// Flat theme configurations
 export const THEMES: Record<ThemeChoice, ThemeConfig> = {
   light: {
     name: 'Light',
@@ -65,11 +74,10 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     themeButtonInactive: 'border-slate-200 text-slate-600 hover:border-slate-300',
   },
 
-  feminine: {
-    name: 'Feminine',
+  flower: {
+    name: 'Flower',
     emoji: '🌸',
     navVariant: 'light',
-    // Rich pink gradient page — obviously feminine at a glance
     pageBg: 'bg-gradient-to-br from-pink-300 via-rose-200 to-fuchsia-200',
     cardBg: 'bg-pink-50',
     cardBorder: 'border-pink-300',
@@ -102,7 +110,6 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     name: 'Pastel',
     emoji: '🎨',
     navVariant: 'light',
-    // Rainbow-soft gradient — dreamy & colourful
     pageBg: 'bg-gradient-to-br from-violet-200 via-purple-100 to-indigo-200',
     cardBg: 'bg-purple-50',
     cardBorder: 'border-violet-300',
@@ -135,7 +142,6 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     name: 'Sports',
     emoji: '⚽',
     navVariant: 'dark',
-    // Near-black with bold orange borders — ESPN/scorecard feel
     pageBg: 'bg-zinc-950',
     cardBg: 'bg-zinc-900',
     cardBorder: 'border-orange-500',
@@ -168,7 +174,6 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     name: 'Dark',
     emoji: '🌙',
     navVariant: 'dark',
-    // True near-black — clean, minimal dark mode
     pageBg: 'bg-slate-950',
     cardBg: 'bg-slate-900',
     cardBorder: 'border-slate-700',
@@ -196,6 +201,49 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     themeButtonActive: 'border-violet-500 bg-slate-800 text-violet-400',
     themeButtonInactive: 'border-slate-700 text-slate-400 hover:border-slate-600',
   },
+
+  mario: {
+    name: 'Mario',
+    emoji: '🍄',
+    navVariant: 'dark',
+    pageBg: '#5C94FC',
+    cardBg: '#F8D870',
+    cardBorder: 'border-black border-b-4 border-r-4',
+    headingColor: '#E4000F',
+    bodyText: 'text-black',
+    mutedText: 'text-gray-700',
+    button: 'bg-red-600 hover:bg-red-700 border-2 border-black',
+    progressGradient: 'from-yellow-400 to-orange-500',
+    progressTrack: 'bg-gray-300',
+    sectionCheckedBg: 'bg-red-100',
+    sectionCheckedBorder: 'border-red-500',
+    sectionCheckedText: 'text-red-700',
+    sectionUncheckedBg: 'bg-yellow-100',
+    sectionUncheckedBorder: 'border-gray-300',
+    checkboxActiveBg: 'bg-red-600',
+    checkboxActiveBorder: 'border-red-600',
+    checkboxInactiveBg: 'bg-white',
+    checkboxInactiveBorder: 'border-gray-400',
+    inputBg: 'bg-white',
+    inputBorder: 'border-black border-2',
+    inputFocus: 'focus:ring-red-500',
+    inputText: 'text-black',
+    labelColor: 'text-gray-800',
+    selectBg: 'bg-white',
+    themeButtonActive: 'border-red-500 bg-red-100 text-red-800',
+    themeButtonInactive: 'border-gray-300 text-gray-600 hover:border-gray-400',
+  },
 };
 
-export const THEME_ORDER: ThemeChoice[] = ['light', 'feminine', 'pastel', 'sports', 'dark'];
+// Helper function to get both config and markers for a theme
+export function getThemeAspects(theme: ThemeChoice): {
+  config: ThemeConfig;
+  markers: ThemeMarkers;
+} {
+  return {
+    config: THEMES[theme],
+    markers: THEME_MARKERS[theme],
+  };
+}
+
+export const THEME_ORDER: ThemeChoice[] = ['light', 'flower', 'pastel', 'sports', 'dark', 'mario'];

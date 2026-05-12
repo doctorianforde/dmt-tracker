@@ -2,7 +2,46 @@ export type UserRole = 'student' | 'supervisor1' | 'supervisor2' | 'drpaul';
 
 export type ApprovalStage = 'pending' | 'supervisor1' | 'supervisor2' | 'drpaul' | 'approved';
 
-export type ThemeChoice = 'light' | 'dark' | 'feminine' | 'pastel' | 'sports';
+export type ThemeChoice = 'light' | 'dark' | 'flower' | 'pastel' | 'sports' | 'mario';
+
+export interface ThemeMarkers {
+  pending: string;
+  inProgress: string;
+  completed: string;
+  approved: string;
+}
+
+export interface ThemeConfig {
+  name: string;
+  emoji: string;
+  navVariant: 'light' | 'dark';
+  pageBg: string;
+  cardBg: string;
+  cardBorder: string;
+  headingColor: string;
+  bodyText: string;
+  mutedText: string;
+  button: string;
+  progressGradient: string;
+  progressTrack: string;
+  sectionCheckedBg: string;
+  sectionCheckedBorder: string;
+  sectionCheckedText: string;
+  sectionUncheckedBg: string;
+  sectionUncheckedBorder: string;
+  checkboxActiveBg: string;
+  checkboxActiveBorder: string;
+  checkboxInactiveBg: string;
+  checkboxInactiveBorder: string;
+  inputBg: string;
+  inputBorder: string;
+  inputFocus: string;
+  inputText: string;
+  labelColor: string;
+  selectBg: string;
+  themeButtonActive: string;
+  themeButtonInactive: string;
+}
 
 export interface UserProfile {
   uid: string;

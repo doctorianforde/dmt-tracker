@@ -1,5 +1,7 @@
 import type { ThemeChoice, ThemeConfig, ThemeMarkers } from '@/types';
 
+export type { ThemeConfig };
+
 // Theme-specific marker symbols/colors
 export const THEME_MARKERS: Record<ThemeChoice, ThemeMarkers> = {
   light: {
@@ -247,3 +249,35 @@ export function getThemeAspects(theme: ThemeChoice): {
 }
 
 export const THEME_ORDER: ThemeChoice[] = ['light', 'flower', 'pastel', 'sports', 'dark', 'mario'];
+
+// Status-specific colors for the progress checklist
+export const statusColors = {
+  pending: {
+    borderColor: 'border-gray-300',
+    bgColor: 'bg-gray-50',
+    textColor: 'text-gray-700',
+    badgeBg: 'bg-gray-200',
+    badgeText: 'text-gray-800',
+  },
+  'in-progress': {
+    borderColor: 'border-blue-300',
+    bgColor: 'bg-blue-50',
+    textColor: 'text-blue-700',
+    badgeBg: 'bg-blue-200',
+    badgeText: 'text-blue-800',
+  },
+  completed: {
+    borderColor: 'border-green-300',
+    bgColor: 'bg-green-50',
+    textColor: 'text-green-700',
+    badgeBg: 'bg-green-200',
+    badgeText: 'text-green-800',
+  },
+  rejected: {
+    borderColor: 'border-red-300',
+    bgColor: 'bg-red-50',
+    textColor: 'text-red-700',
+    badgeBg: 'bg-red-200',
+    badgeText: 'text-red-800',
+  },
+};

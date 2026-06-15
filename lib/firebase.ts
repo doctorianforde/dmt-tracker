@@ -21,5 +21,20 @@ function buildApp(): FirebaseApp | null {
 
 const app = buildApp();
 
-export const db = (app ? getFirestore(app) : null) as Firestore;
-export const auth = (app ? getAuth(app) : null) as Auth;
+export const db = app ? getFirestore(app) : null;
+export const auth = app ? getAuth(app) : null;
+
+export function getSafeDb(): Firestore {
+  if (!db) throw new Error("Firestore not initialized. Check your environment variables.");
+  return db;
+}
+
+export function getSafeAuth(): Auth {
+  if (!auth) throw new Error("Auth not initialized. Check your environment variables.");
+  return auth;
+}
+
+export function getSafeDb(): Firestore {
+  if (!db) throw new Error("Firestore is not initialized. Check your environment variables.");
+  return db;
+}

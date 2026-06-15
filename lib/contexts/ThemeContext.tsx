@@ -1,3 +1,5 @@
+'use client';
+
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import type { ThemeChoice, ThemeConfig, ThemeMarkers } from '@/types';
 import { getSavedTheme, setSavedTheme, getThemeAspects } from '@/lib/themes';

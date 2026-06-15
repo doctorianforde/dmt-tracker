@@ -1,7 +1,6 @@
 'use client';
 
-import type { CaseSections } from '@/types';
-import type { ThemeConfig } from '@/lib/themes';
+import type { CaseSections, ThemeConfig } from '@/types';
 
 interface Props {
   sections: CaseSections;

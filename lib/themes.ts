@@ -1,7 +1,5 @@
 import type { ThemeChoice, ThemeConfig, ThemeMarkers } from '@/types';
 
-export type { ThemeConfig };
-
 // Theme-specific marker symbols/colors
 export const THEME_MARKERS: Record<ThemeChoice, ThemeMarkers> = {
   light: {
@@ -208,32 +206,33 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     name: 'Mario',
     emoji: '🍄',
     navVariant: 'dark',
-    pageBg: '#5C94FC',
-    cardBg: '#F8D870',
-    cardBorder: 'border-black border-b-4 border-r-4',
-    headingColor: '#E4000F',
-    bodyText: 'text-black',
-    mutedText: 'text-gray-700',
-    button: 'bg-red-600 hover:bg-red-700 border-2 border-black',
+    // Mario Sky Blue background with a retro ground hint
+    pageBg: 'bg-[#5C94FC]',
+    cardBg: 'bg-[#F8D870]',
+    cardBorder: 'border-black border-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]',
+    headingColor: 'text-[#E4000F]',
+    bodyText: 'text-black font-mono',
+    mutedText: 'text-gray-800 font-mono',
+    button: 'bg-red-600 hover:bg-red-700 border-2 border-black text-white font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5',
     progressGradient: 'from-yellow-400 to-orange-500',
-    progressTrack: 'bg-gray-300',
-    sectionCheckedBg: 'bg-red-100',
-    sectionCheckedBorder: 'border-red-500',
-    sectionCheckedText: 'text-red-700',
-    sectionUncheckedBg: 'bg-yellow-100',
-    sectionUncheckedBorder: 'border-gray-300',
+    progressTrack: 'bg-gray-300 border-black border-2',
+    sectionCheckedBg: 'bg-green-400',
+    sectionCheckedBorder: 'border-green-700 border-2',
+    sectionCheckedText: 'text-white font-bold',
+    sectionUncheckedBg: 'bg-[#F8D870]',
+    sectionUncheckedBorder: 'border-black border-2',
     checkboxActiveBg: 'bg-red-600',
-    checkboxActiveBorder: 'border-red-600',
+    checkboxActiveBorder: 'border-black',
     checkboxInactiveBg: 'bg-white',
     checkboxInactiveBorder: 'border-gray-400',
     inputBg: 'bg-white',
-    inputBorder: 'border-black border-2',
-    inputFocus: 'focus:ring-red-500',
-    inputText: 'text-black',
-    labelColor: 'text-gray-800',
+    inputBorder: 'border-black border-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]',
+    inputFocus: 'focus:ring-red-500 focus:border-red-600',
+    inputText: 'text-black font-mono',
+    labelColor: 'text-gray-900 font-bold',
     selectBg: 'bg-white',
-    themeButtonActive: 'border-red-500 bg-red-100 text-red-800',
-    themeButtonInactive: 'border-gray-300 text-gray-600 hover:border-gray-400',
+    themeButtonActive: 'border-red-600 bg-red-100 text-red-800 border-2',
+    themeButtonInactive: 'border-gray-300 text-gray-600 hover:border-gray-400 border-2',
   },
 };
 
@@ -249,35 +248,3 @@ export function getThemeAspects(theme: ThemeChoice): {
 }
 
 export const THEME_ORDER: ThemeChoice[] = ['light', 'flower', 'pastel', 'sports', 'dark', 'mario'];
-
-// Status-specific colors for the progress checklist
-export const statusColors = {
-  pending: {
-    borderColor: 'border-gray-300',
-    bgColor: 'bg-gray-50',
-    textColor: 'text-gray-700',
-    badgeBg: 'bg-gray-200',
-    badgeText: 'text-gray-800',
-  },
-  'in-progress': {
-    borderColor: 'border-blue-300',
-    bgColor: 'bg-blue-50',
-    textColor: 'text-blue-700',
-    badgeBg: 'bg-blue-200',
-    badgeText: 'text-blue-800',
-  },
-  completed: {
-    borderColor: 'border-green-300',
-    bgColor: 'bg-green-50',
-    textColor: 'text-green-700',
-    badgeBg: 'bg-green-200',
-    badgeText: 'text-green-800',
-  },
-  rejected: {
-    borderColor: 'border-red-300',
-    bgColor: 'bg-red-50',
-    textColor: 'text-red-700',
-    badgeBg: 'bg-red-200',
-    badgeText: 'text-red-800',
-  },
-};

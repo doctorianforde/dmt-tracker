@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ThemeProvider } from '@/contexts/ThemeContext';
+import { ThemeProvider } from '@/lib/contexts/ThemeContext';
 
 export default function ThemeWrapper({ children }: { children: React.ReactNode }) {
   return (

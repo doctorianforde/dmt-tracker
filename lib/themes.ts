@@ -20,11 +20,12 @@ export const THEME_MARKERS: Record<ThemeChoice, ThemeMarkers> = {
     completed: '●',
     approved: '✅',
   },
-  sports: {
-    pending: '◇',
-    inProgress: '◈',
-    completed: '◆',
-    approved: '⭐',
+  football: {
+    // World Cup Theme Markers
+    pending: '⚽',       // Ball waiting to be kicked
+    inProgress: '🏃‍♂️',   // Player running
+    completed: '⚽️',     // Goal scored (or net) - using ball with emphasis or 🥅 if preferred, sticking to consistent set
+    approved: '🏆',      // Trophy lift
   },
   dark: {
     pending: '◇',
@@ -138,36 +139,37 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     themeButtonInactive: 'border-violet-200 text-violet-700 hover:border-violet-400',
   },
 
-  sports: {
-    name: 'Sports',
+  football: {
+    name: 'Football',
     emoji: '⚽',
     navVariant: 'dark',
-    pageBg: 'bg-zinc-950',
-    cardBg: 'bg-zinc-900',
-    cardBorder: 'border-orange-500',
-    headingColor: 'text-white',
-    bodyText: 'text-zinc-300',
-    mutedText: 'text-zinc-400',
-    button: 'bg-orange-500 hover:bg-orange-600',
-    progressGradient: 'from-orange-400 to-red-600',
-    progressTrack: 'bg-zinc-700',
-    sectionCheckedBg: 'bg-zinc-800',
-    sectionCheckedBorder: 'border-orange-400',
-    sectionCheckedText: 'text-orange-300',
-    sectionUncheckedBg: 'bg-zinc-900',
-    sectionUncheckedBorder: 'border-zinc-700',
-    checkboxActiveBg: 'bg-orange-500',
-    checkboxActiveBorder: 'border-orange-500',
-    checkboxInactiveBg: 'bg-zinc-800',
-    checkboxInactiveBorder: 'border-zinc-600',
-    inputBg: 'bg-zinc-800',
-    inputBorder: 'border-zinc-700',
-    inputFocus: 'focus:ring-orange-500',
-    inputText: 'text-white',
-    labelColor: 'text-orange-400',
-    selectBg: 'bg-zinc-800',
-    themeButtonActive: 'border-orange-500 bg-zinc-800 text-orange-400',
-    themeButtonInactive: 'border-zinc-700 text-zinc-400 hover:border-zinc-500',
+    // World Cup Aesthetic: Deep Green Pitch, Gold Accents, White Lines
+    pageBg: 'bg-gradient-to-b from-green-900 to-green-800',
+    cardBg: 'bg-white/95 backdrop-blur-sm',
+    cardBorder: 'border-yellow-500 border-2',
+    headingColor: 'text-green-950 font-bold uppercase tracking-wide',
+    bodyText: 'text-gray-800',
+    mutedText: 'text-green-700',
+    button: 'bg-yellow-500 hover:bg-yellow-600 text-black font-bold shadow-md border-b-4 border-yellow-700 active:border-b-0 active:translate-y-1',
+    progressGradient: 'from-yellow-400 to-yellow-600',
+    progressTrack: 'bg-green-200',
+    sectionCheckedBg: 'bg-green-50',
+    sectionCheckedBorder: 'border-yellow-500 border-2',
+    sectionCheckedText: 'text-green-900 font-bold',
+    sectionUncheckedBg: 'bg-white/80',
+    sectionUncheckedBorder: 'border-gray-300 border-2',
+    checkboxActiveBg: 'bg-green-600',
+    checkboxActiveBorder: 'border-yellow-500',
+    checkboxInactiveBg: 'bg-gray-100',
+    checkboxInactiveBorder: 'border-gray-400',
+    inputBg: 'bg-white',
+    inputBorder: 'border-gray-300 border-2',
+    inputFocus: 'focus:ring-yellow-500 focus:border-yellow-500',
+    inputText: 'text-black font-mono',
+    labelColor: 'text-green-800 font-semibold',
+    selectBg: 'bg-white',
+    themeButtonActive: 'border-yellow-500 bg-yellow-100 text-green-900 border-2 font-bold',
+    themeButtonInactive: 'border-gray-300 text-gray-600 hover:border-gray-400 border-2',
   },
 
   dark: {
@@ -206,8 +208,6 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     name: 'Mario',
     emoji: '🍄',
     navVariant: 'dark',
-    // Using bg-sky-500 as a close Tailwind match to #5C94FC if arbitrary values fail, 
-    // but keeping arbitrary value for precision.
     pageBg: 'bg-[#5C94FC]',
     cardBg: 'bg-[#F8D870]',
     cardBorder: 'border-black border-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]',
@@ -237,7 +237,7 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
   },
 };
 
-export const THEME_ORDER: ThemeChoice[] = ['light', 'flower', 'pastel', 'sports', 'dark', 'mario'];
+export const THEME_ORDER: ThemeChoice[] = ['light', 'flower', 'pastel', 'football', 'dark', 'mario'];
 
 const STORAGE_KEY = 'dmt-tracker-theme';
 

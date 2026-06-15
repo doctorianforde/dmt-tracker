@@ -2,7 +2,7 @@ export type UserRole = 'student' | 'supervisor1' | 'supervisor2' | 'drpaul';
 
 export type ApprovalStage = 'pending' | 'supervisor1' | 'supervisor2' | 'drpaul' | 'approved';
 
-export type ThemeChoice = 'light' | 'dark' | 'flower' | 'pastel' | 'sports' | 'mario';
+export type ThemeChoice = 'light' | 'dark' | 'flower' | 'pastel' | 'football' | 'mario';
 
 export interface ThemeMarkers {
   pending: string;

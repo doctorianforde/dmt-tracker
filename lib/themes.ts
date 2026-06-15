@@ -206,7 +206,8 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     name: 'Mario',
     emoji: '🍄',
     navVariant: 'dark',
-    // Mario Sky Blue background with a retro ground hint
+    // Using bg-sky-500 as a close Tailwind match to #5C94FC if arbitrary values fail, 
+    // but keeping arbitrary value for precision.
     pageBg: 'bg-[#5C94FC]',
     cardBg: 'bg-[#F8D870]',
     cardBorder: 'border-black border-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]',
@@ -236,6 +237,33 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
   },
 };
 
+export const THEME_ORDER: ThemeChoice[] = ['light', 'flower', 'pastel', 'sports', 'dark', 'mario'];
+
+const STORAGE_KEY = 'dmt-tracker-theme';
+
+/**
+ * Retrieves the saved theme from localStorage, falling back to 'light'.
+ */
+export function getSavedTheme(): ThemeChoice {
+  if (typeof window === 'undefined') {
+    return 'light';
+  }
+  const saved = localStorage.getItem(STORAGE_KEY) as ThemeChoice | null;
+  if (saved && Object.keys(THEMES).includes(saved)) {
+    return saved;
+  }
+  return 'light';
+}
+
+/**
+ * Saves the theme to localStorage.
+ */
+export function setSavedTheme(theme: ThemeChoice): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY, theme);
+  }
+}
+
 // Helper function to get both config and markers for a theme
 export function getThemeAspects(theme: ThemeChoice): {
   config: ThemeConfig;
@@ -246,5 +274,3 @@ export function getThemeAspects(theme: ThemeChoice): {
     markers: THEME_MARKERS[theme],
   };
 }
-
-export const THEME_ORDER: ThemeChoice[] = ['light', 'flower', 'pastel', 'sports', 'dark', 'mario'];

@@ -1,6 +1,5 @@
 import type { ThemeChoice, ThemeConfig, ThemeMarkers } from '@/types';
 
-// Theme-specific marker symbols/colors
 export const THEME_MARKERS: Record<ThemeChoice, ThemeMarkers> = {
   light: {
     pending: '○',
@@ -21,11 +20,10 @@ export const THEME_MARKERS: Record<ThemeChoice, ThemeMarkers> = {
     approved: '✅',
   },
   football: {
-    // World Cup Theme Markers
-    pending: '⚽',       // Ball waiting to be kicked
-    inProgress: '🏃‍♂️',   // Player running
-    completed: '⚽️',     // Goal scored (or net) - using ball with emphasis or 🥅 if preferred, sticking to consistent set
-    approved: '🏆',      // Trophy lift
+    pending: '⚽',
+    inProgress: '🏃‍♂️',
+    completed: '⚽️',
+    approved: '🏆',
   },
   dark: {
     pending: '◇',
@@ -41,7 +39,6 @@ export const THEME_MARKERS: Record<ThemeChoice, ThemeMarkers> = {
   },
 };
 
-// Flat theme configurations
 export const THEMES: Record<ThemeChoice, ThemeConfig> = {
   light: {
     name: 'Light',
@@ -74,7 +71,6 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     themeButtonActive: 'border-sky-500 bg-sky-50 text-sky-800',
     themeButtonInactive: 'border-slate-200 text-slate-600 hover:border-slate-300',
   },
-
   flower: {
     name: 'Flower',
     emoji: '🌸',
@@ -106,7 +102,6 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     themeButtonActive: 'border-fuchsia-500 bg-pink-50 text-fuchsia-800',
     themeButtonInactive: 'border-pink-200 text-pink-700 hover:border-pink-400',
   },
-
   pastel: {
     name: 'Pastel',
     emoji: '🎨',
@@ -138,12 +133,10 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     themeButtonActive: 'border-violet-500 bg-violet-50 text-violet-800',
     themeButtonInactive: 'border-violet-200 text-violet-700 hover:border-violet-400',
   },
-
   football: {
     name: 'Football',
     emoji: '⚽',
     navVariant: 'dark',
-    // World Cup Aesthetic: Deep Green Pitch, Gold Accents, White Lines
     pageBg: 'bg-gradient-to-b from-green-900 to-green-800',
     cardBg: 'bg-white/95 backdrop-blur-sm',
     cardBorder: 'border-yellow-500 border-2',
@@ -171,7 +164,6 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     themeButtonActive: 'border-yellow-500 bg-yellow-100 text-green-900 border-2 font-bold',
     themeButtonInactive: 'border-gray-300 text-gray-600 hover:border-gray-400 border-2',
   },
-
   dark: {
     name: 'Dark',
     emoji: '🌙',
@@ -203,7 +195,6 @@ export const THEMES: Record<ThemeChoice, ThemeConfig> = {
     themeButtonActive: 'border-violet-500 bg-slate-800 text-violet-400',
     themeButtonInactive: 'border-slate-700 text-slate-400 hover:border-slate-600',
   },
-
   mario: {
     name: 'Mario',
     emoji: '🍄',
@@ -241,9 +232,6 @@ export const THEME_ORDER: ThemeChoice[] = ['light', 'flower', 'pastel', 'footbal
 
 const STORAGE_KEY = 'dmt-tracker-theme';
 
-/**
- * Retrieves the saved theme from localStorage, falling back to 'light'.
- */
 export function getSavedTheme(): ThemeChoice {
   if (typeof window === 'undefined') {
     return 'light';
@@ -255,16 +243,12 @@ export function getSavedTheme(): ThemeChoice {
   return 'light';
 }
 
-/**
- * Saves the theme to localStorage.
- */
 export function setSavedTheme(theme: ThemeChoice): void {
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, theme);
   }
 }
 
-// Helper function to get both config and markers for a theme
 export function getThemeAspects(theme: ThemeChoice): {
   config: ThemeConfig;
   markers: ThemeMarkers;

@@ -1,0 +1,92 @@
+═══════════════════════════════════════════════════════════════════════════════
+                     DMT TRACKER - TEST ACCOUNTS QUICK REFERENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+🔐 SUPERVISORS (Sign up via /supervisor-signup)
+──────────────────────────────────────────────────────────────────────────────
+
+SUPERVISOR 1 (Primary Reviewer)
+  Email:    supervisor1@test.edu
+  Password: Test1234!
+  Name:     Dr. Davin Powdhar
+  Role:     Supervisor 1
+  Code:     (Check .env.local for NEXT_PUBLIC_CODE_SUPERVISOR1)
+
+SUPERVISOR 2 (Secondary Reviewer)
+  Email:    supervisor2@test.edu
+  Password: Test1234!
+  Name:     Dr. Windale
+  Role:     Supervisor 2
+  Code:     (Check .env.local for NEXT_PUBLIC_CODE_SUPERVISOR2)
+
+DR. PAUL (Lead Supervisor)
+  Email:    drpaul@test.edu
+  Password: Test1234!
+  Name:     Dr. Paul
+  Role:     Dr. Paul (Lead Supervisor)
+  Code:     (Check .env.local for NEXT_PUBLIC_CODE_DRPAUL)
+
+──────────────────────────────────────────────────────────────────────────────
+
+👥 STUDENTS (Sign up via main / page)
+──────────────────────────────────────────────────────────────────────────────
+
+STUDENT 1 - Pending (Not Started)
+  Email:    student1@test.edu
+  Password: Test1234!
+  Name:     Alice Johnson
+  Case:     DMT-2024-001
+  Status:   Pending (sections 2/5)
+
+STUDENT 2 - Supervisor 1 Review (Ready)
+  Email:    student2@test.edu
+  Password: Test1234!
+  Name:     Bob Smith
+  Case:     DMT-2024-002
+  Status:   supervisor1 (sections 5/5)
+
+STUDENT 3 - Supervisor 2 Review (Sup1 Approved)
+  Email:    student3@test.edu
+  Password: Test1234!
+  Name:     Carol Davis
+  Case:     DMT-2024-003
+  Status:   supervisor2 (sections 5/5)
+
+STUDENT 4 - Dr. Paul Review (Both Sups Approved)
+  Email:    student4@test.edu
+  Password: Test1234!
+  Name:     David Wilson
+  Case:     DMT-2024-004
+  Status:   drpaul (sections 5/5)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✨ QUICK TEST WORKFLOW
+──────────────────────────────────────────────────────────────────────────────
+
+1. Sign in as Supervisor 1 → See all 4 cases
+   - DMT-2024-002: Ready for approval (button enabled)
+   - Others: Waiting or completed
+
+2. Sign in as Supervisor 2 → See all 4 cases
+   - DMT-2024-003: Ready for approval (button enabled)
+   - Others: Can't approve yet or completed
+
+3. Sign in as Dr. Paul → See all 4 cases
+   - DMT-2024-004: Ready for final approval (button enabled)
+   - Others: Waiting for previous approvals
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📋 CASE APPROVAL STAGES IN FIRESTORE
+──────────────────────────────────────────────────────────────────────────────
+
+DMT-2024-001: approvalStage = "pending"
+DMT-2024-002: approvalStage = "supervisor1"
+DMT-2024-003: approvalStage = "supervisor2"
+DMT-2024-004: approvalStage = "drpaul"
+
+Set supervisor1Approval, supervisor2Approval, drpaulApproval to:
+  { approved: true, approvedAt: <timestamp> }
+
+═══════════════════════════════════════════════════════════════════════════════

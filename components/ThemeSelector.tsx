@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useTheme } from '@/lib/contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { THEMES, THEME_ORDER } from '@/lib/themes';
 import type { ThemeChoice } from '@/types';
 

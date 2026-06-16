@@ -258,3 +258,28 @@ export function getThemeAspects(theme: ThemeChoice): {
     markers: THEME_MARKERS[theme],
   };
 }
+
+// ── Motivational Quotes ────────────────────────────────────────────────────────
+
+const MOTIVATIONAL_QUOTES = [
+  "It's not about being the best. It's about being better than you were yesterday.",
+  "The difference between ordinary and extraordinary is that little extra.",
+  "Champions aren't made in gyms. Champions are made from something they have deep inside them: a desire, a dream, a vision.",
+  "Success is no accident. It is hard work, perseverance, learning, studying, sacrifice and most of all, love of what you are doing.",
+  "Do not let what you cannot do interfere with what you can do.",
+  "Push yourself, because no one else is going to do it for you.",
+  "Great things never come from comfort zones.",
+  "Winners never quit and quitters never win.",
+  "You don't have to be great to start, but you have to start to be great.",
+  "The only way to define your limits is by going beyond them.",
+  "Focus on the step in front of you, not the whole staircase.",
+  "Your limitation—it's only your imagination.",
+  "Dream it. Wish it. Do it.",
+  "Stay positive, work hard, make it happen.",
+  "Don't stop when you're tired. Stop when you're done.",
+];
+
+export function getRandomQuote(): string {
+  const index = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
+  return MOTIVATIONAL_QUOTES[index];
+}

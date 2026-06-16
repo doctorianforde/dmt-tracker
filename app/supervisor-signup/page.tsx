@@ -6,23 +6,12 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import type { UserRole } from '@/types';
 
-const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
-  { value: 'supervisor1', label: 'Supervisor 1' },
-  { value: 'supervisor2', label: 'Supervisor 2' },
-  { value: 'drpaul', label: 'Dr. Paul (Lead Supervisor)' },
-];
-
-const ROLE_CODES: Record<string, string | undefined> = {
-  supervisor1: process.env.NEXT_PUBLIC_CODE_SUPERVISOR1,
-  supervisor2: process.env.NEXT_PUBLIC_CODE_SUPERVISOR2,
-  drpaul: process.env.NEXT_PUBLIC_CODE_DRPAUL,
-};
+const SUPERVISOR_CODE = process.env.NEXT_PUBLIC_CODE_SUPERVISOR;
 
 export default function SupervisorSignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('supervisor1');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -41,14 +30,12 @@ export default function SupervisorSignupPage() {
     e.preventDefault();
     setError('');
 
-    // Validate invite code
-    const expectedCode = ROLE_CODES[role];
-    if (!expectedCode) {
+    if (!SUPERVISOR_CODE) {
       setError('Invite codes are not configured. Contact the administrator.');
       return;
     }
-    if (code.trim() !== expectedCode.trim()) {
-      setError('Incorrect invite code for this role. Please check with your administrator.');
+    if (code.trim() !== SUPERVISOR_CODE.trim()) {
+      setError('Incorrect invite code. Please check with your administrator.');
       return;
     }
     if (!name.trim()) {
@@ -58,7 +45,7 @@ export default function SupervisorSignupPage() {
 
     setSubmitting(true);
     try {
-      await signUpWithRole(email, password, name.trim(), role);
+      await signUpWithRole(email, password, name.trim(), 'supervisor');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Sign-up failed';
       if (msg.includes('email-already-in-use')) {
@@ -73,12 +60,6 @@ export default function SupervisorSignupPage() {
     }
   };
 
-  const roleLabels: Record<UserRole, { color: string; badge: string }> = {
-    student: { color: 'sky', badge: 'bg-sky-100 text-sky-800' },
-    supervisor1: { color: 'violet', badge: 'bg-violet-100 text-violet-800' },
-    supervisor2: { color: 'indigo', badge: 'bg-indigo-100 text-indigo-800' },
-    drpaul: { color: 'emerald', badge: 'bg-emerald-100 text-emerald-800' },
-  };
 
   return (
     <div className="min-h-screen flex">
@@ -142,35 +123,10 @@ export default function SupervisorSignupPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Role selector */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                  Your Role
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {ROLE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setRole(opt.value)}
-                      className={`py-2.5 px-2 rounded-xl border-2 text-xs font-semibold transition-all text-center ${
-                        role === opt.value
-                          ? 'border-violet-500 bg-violet-50 text-violet-800'
-                          : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Selected role badge */}
-              <div className="flex items-center gap-2">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${roleLabels[role].badge}`}>
-                  {ROLE_OPTIONS.find((o) => o.value === role)?.label}
-                </span>
-                <span className="text-xs text-slate-400">selected</span>
+              {/* Role info badge */}
+              <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-xl px-3 py-2">
+                <span className="text-violet-600">👥</span>
+                <span className="text-xs text-violet-700 font-medium">Signing up as Supervisor</span>
               </div>
 
               {/* Name */}
@@ -228,12 +184,12 @@ export default function SupervisorSignupPage() {
                   type="text"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  placeholder="Enter your role invite code"
+                  placeholder="Enter your supervisor invite code"
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent font-mono tracking-widest"
                   required
                 />
                 <p className="text-xs text-slate-400 mt-1.5">
-                  Each role has a unique code — contact the administrator if you don&apos;t have yours
+                  Contact your administrator if you don&apos;t have your invite code
                 </p>
               </div>
 

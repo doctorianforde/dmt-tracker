@@ -8,7 +8,7 @@ import CaseTable from '@/components/CaseTable';
 import { getAllCases, updateGreenLight, updateApprovalStage } from '@/lib/firestore';
 import type { CaseRecord, ApprovalStage } from '@/types';
 
-const SUPERVISOR_ROLES = ['supervisor1', 'supervisor2', 'drpaul'] as const;
+const SUPERVISOR_ROLES = ['supervisor', 'drpaul'] as const;
 
 export default function SupervisorDashboard() {
   return (
@@ -54,15 +54,12 @@ function Dashboard() {
   };
 
   const ROLE_TITLE: Record<string, string> = {
-    supervisor1: 'Supervisor 1',
-    supervisor2: 'Supervisor 2',
+    supervisor: 'Supervisor',
     drpaul: 'Dr. Paul — Lead Supervisor',
   };
 
   const isDrPaul = userProfile?.role === 'drpaul';
-  const supervisorRole = (userProfile?.role === 'supervisor1' || userProfile?.role === 'supervisor2')
-    ? userProfile.role
-    : undefined;
+  const isSupervisor = userProfile?.role === 'supervisor';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -109,37 +106,19 @@ function Dashboard() {
             </div>
           </div>
         )}
-        {userProfile?.role === 'supervisor1' && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl px-5 py-3.5 space-y-2">
+        {isSupervisor && (
+          <div className="bg-violet-50 border border-violet-200 rounded-xl px-5 py-3.5 space-y-2">
             <div className="flex items-start gap-3">
-              <span className="text-orange-500 text-lg">🟠</span>
+              <span className="text-violet-600 text-lg">👨‍⚕️</span>
               <div>
-                <p className="text-sm font-semibold text-orange-800">Supervisor 1 — Primary Reviewer</p>
-                <p className="text-sm text-orange-700 mt-0.5">
-                  You are the first reviewer for all cases. You must approve each case before it can proceed to Supervisor 2. You can also assign a second supervisor if needed.
+                <p className="text-sm font-semibold text-violet-900">Supervisor Review Panel</p>
+                <p className="text-sm text-violet-700 mt-0.5">
+                  You review case submissions assigned to you by students. Your role depends on the case: you may be the primary reviewer, secondary reviewer, or both depending on student assignments.
                 </p>
-                <ul className="text-sm text-orange-700 mt-2 ml-4 space-y-1 list-disc">
-                  <li>Review case completeness and quality</li>
-                  <li>Approve cases and forward to Supervisor 2</li>
-                  <li>Provide feedback for improvements</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-        {userProfile?.role === 'supervisor2' && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3.5 space-y-2">
-            <div className="flex items-start gap-3">
-              <span className="text-amber-500 text-lg">🟡</span>
-              <div>
-                <p className="text-sm font-semibold text-amber-800">Supervisor 2 — Secondary Reviewer</p>
-                <p className="text-sm text-amber-700 mt-0.5">
-                  You review cases that have already been approved by Supervisor 1. Both supervisors must approve before the case moves to Dr. Paul.
-                </p>
-                <ul className="text-sm text-amber-700 mt-2 ml-4 space-y-1 list-disc">
-                  <li>Review cases already approved by Supervisor 1</li>
-                  <li>Provide additional feedback and suggestions</li>
-                  <li>Approve and forward to Dr. Paul for final approval</li>
+                <ul className="text-sm text-violet-700 mt-2 ml-4 space-y-1 list-disc">
+                  <li>Review assigned case completeness and quality</li>
+                  <li>Approve cases to move them forward in the pipeline</li>
+                  <li>Provide feedback for improvements when needed</li>
                 </ul>
               </div>
             </div>
@@ -179,7 +158,8 @@ function Dashboard() {
           <CaseTable
             cases={cases}
             isDrPaul={isDrPaul}
-            supervisorRole={supervisorRole}
+            isSupervisor={isSupervisor}
+            supervisorName={userProfile?.name}
             onGreenLight={handleGreenLight}
             onStageAdvance={handleStageAdvance}
           />

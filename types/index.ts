@@ -1,4 +1,4 @@
-export type UserRole = 'student' | 'supervisor1' | 'supervisor2' | 'drpaul';
+export type UserRole = 'student' | 'supervisor' | 'drpaul';
 
 export type ApprovalStage = 'pending' | 'supervisor1' | 'supervisor2' | 'drpaul' | 'approved';
 

@@ -1,23 +1,17 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const DEFAULT_DEADLINE = new Date('2026-06-30T23:59:59');
 
-const MOTIVATIONAL_MESSAGES = [
-  { threshold: 100, msg: "You're well ahead — keep building that momentum! 🚀", emoji: '🌟' },
-  { threshold: 90, msg: "Great start! Consistency is your superpower. 💪", emoji: '💪' },
-  { threshold: 60, msg: "You're making solid progress — stay the course! 📈", emoji: '📈' },
-  { threshold: 30, msg: "More than halfway there — you've got this! 🎯", emoji: '🎯' },
-  { threshold: 0, msg: "The finish line is in sight — give it your all! 🏁", emoji: '🏁' },
-];
-
 interface Props {
   customDeadline?: string;   // ISO date string e.g. "2026-06-30"
-  completionPercent?: number; // 0–100 for motivational message
+  completionPercent?: number; // 0–100 (for tracking progress)
 }
 
 export default function DeadlineCountdown({ customDeadline, completionPercent = 0 }: Props) {
+  const { activeQuote } = useTheme();
   const { days, urgency, deadline } = useMemo(() => {
     const deadline = customDeadline ? new Date(customDeadline + 'T23:59:59') : DEFAULT_DEADLINE;
     const diff = deadline.getTime() - Date.now();
@@ -38,9 +32,6 @@ export default function DeadlineCountdown({ customDeadline, completionPercent = 
     warning: 'bg-amber-400',
     ok: 'bg-sky-400',
   };
-
-  const motivational = MOTIVATIONAL_MESSAGES.find(m => completionPercent >= m.threshold)
-    ?? MOTIVATIONAL_MESSAGES[MOTIVATIONAL_MESSAGES.length - 1];
 
   const deadlineLabel = deadline.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -69,10 +60,10 @@ export default function DeadlineCountdown({ customDeadline, completionPercent = 
         </div>
       </div>
 
-      {/* Motivational message */}
-      <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex items-center gap-3">
-        <span className="text-xl">{motivational.emoji}</span>
-        <p className="text-sm text-emerald-800 font-medium">{motivational.msg}</p>
+      {/* Random Motivational Quote */}
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-start gap-3">
+        <span className="text-xl flex-shrink-0 mt-0.5">💡</span>
+        <p className="text-sm text-emerald-800 font-medium italic leading-relaxed">{activeQuote}</p>
       </div>
     </div>
   );

@@ -277,6 +277,21 @@ const MOTIVATIONAL_QUOTES = [
   "Dream it. Wish it. Do it.",
   "Stay positive, work hard, make it happen.",
   "Don't stop when you're tired. Stop when you're done.",
+  "Excellence is not a destination; it is a continuous journey that never ends.",
+  "The key to success is to focus on goals, not obstacles.",
+  "Your potential is endless. Your growth is optional. Choose growth.",
+  "Discipline is choosing between what you want now and what you want most.",
+  "Success doesn't just find you. You have to go out and get it.",
+  "The pain of discipline weighs ounces while the pain of regret weighs tons.",
+  "Don't watch the clock; do what it does. Keep going.",
+  "Rise above the storm and you will find the sunshine.",
+  "Believe you can and you're halfway there.",
+  "The future depends on what you do today.",
+  "Quality is not an act, it is a habit.",
+  "You are capable of more than you know.",
+  "Every accomplishment starts with the decision to try.",
+  "Strive for progress, not perfection.",
+  "Your hard work will pay off. You just need to keep pushing.",
 ];
 
 export function getRandomQuote(): string {

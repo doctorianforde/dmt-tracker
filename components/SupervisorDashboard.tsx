@@ -97,47 +97,72 @@ function Dashboard() {
 
         {/* Role info banners */}
         {isDrPaul && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3.5 flex items-center gap-3">
-            <span className="text-emerald-600">✅</span>
-            <p className="text-sm text-emerald-800">
-              <span className="font-semibold">Dr. Paul mode active.</span>{' '}
-              You can approve or revoke case submissions and advance cases through all stages.
-            </p>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3.5 space-y-2">
+            <div className="flex items-start gap-3">
+              <span className="text-emerald-600 text-lg">✅</span>
+              <div>
+                <p className="text-sm font-semibold text-emerald-800">Dr. Paul — Lead Supervisor</p>
+                <p className="text-sm text-emerald-700 mt-0.5">
+                  You provide final approval for all case reports. Cases must be approved by both Supervisor 1 and Supervisor 2 before reaching you.
+                </p>
+              </div>
+            </div>
           </div>
         )}
         {userProfile?.role === 'supervisor1' && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl px-5 py-3.5 flex items-center gap-3">
-            <span className="text-orange-500">🟠</span>
-            <p className="text-sm text-orange-800">
-              <span className="font-semibold">Supervisor 1.</span>{' '}
-              You can accept cases for review and forward them to Supervisor 2.
-            </p>
+          <div className="bg-orange-50 border border-orange-200 rounded-xl px-5 py-3.5 space-y-2">
+            <div className="flex items-start gap-3">
+              <span className="text-orange-500 text-lg">🟠</span>
+              <div>
+                <p className="text-sm font-semibold text-orange-800">Supervisor 1 — Primary Reviewer</p>
+                <p className="text-sm text-orange-700 mt-0.5">
+                  You are the first reviewer for all cases. You must approve each case before it can proceed to Supervisor 2. You can also assign a second supervisor if needed.
+                </p>
+                <ul className="text-sm text-orange-700 mt-2 ml-4 space-y-1 list-disc">
+                  <li>Review case completeness and quality</li>
+                  <li>Approve cases and forward to Supervisor 2</li>
+                  <li>Provide feedback for improvements</li>
+                </ul>
+              </div>
+            </div>
           </div>
         )}
         {userProfile?.role === 'supervisor2' && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3.5 flex items-center gap-3">
-            <span className="text-amber-500">🟡</span>
-            <p className="text-sm text-amber-800">
-              <span className="font-semibold">Supervisor 2.</span>{' '}
-              You can forward reviewed cases to Dr. Paul.
-            </p>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3.5 space-y-2">
+            <div className="flex items-start gap-3">
+              <span className="text-amber-500 text-lg">🟡</span>
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Supervisor 2 — Secondary Reviewer</p>
+                <p className="text-sm text-amber-700 mt-0.5">
+                  You review cases that have already been approved by Supervisor 1. Both supervisors must approve before the case moves to Dr. Paul.
+                </p>
+                <ul className="text-sm text-amber-700 mt-2 ml-4 space-y-1 list-disc">
+                  <li>Review cases already approved by Supervisor 1</li>
+                  <li>Provide additional feedback and suggestions</li>
+                  <li>Approve and forward to Dr. Paul for final approval</li>
+                </ul>
+              </div>
+            </div>
           </div>
         )}
 
         {/* Approval stage legend */}
         <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Approval Pipeline</p>
-          <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Approval Pipeline</p>
+          <div className="space-y-2">
             {[
-              { color: 'bg-slate-300', label: 'Pending' },
-              { color: 'bg-orange-400', label: 'Supervisor 1' },
-              { color: 'bg-amber-400', label: 'Supervisor 2' },
-              { color: 'bg-yellow-300', label: 'Dr. Paul' },
-              { color: 'bg-emerald-500', label: 'Approved' },
-            ].map(({ color, label }) => (
-              <div key={label} className="flex items-center gap-1.5 text-xs text-slate-600">
-                <span className={`w-3 h-3 rounded-full ${color}`} />
-                {label}
+              { color: 'bg-slate-300', label: 'Pending', desc: 'Awaiting submission & Supervisor 1 review' },
+              { color: 'bg-orange-400', label: 'Supervisor 1', desc: 'Awaiting Supervisor 1 approval' },
+              { color: 'bg-amber-400', label: 'Supervisor 2', desc: 'Supervisor 1 approved, awaiting Supervisor 2' },
+              { color: 'bg-yellow-300', label: 'Dr. Paul', desc: 'Both supervisors approved, awaiting Dr. Paul' },
+              { color: 'bg-emerald-500', label: 'Approved', desc: 'Final approval granted by Dr. Paul' },
+            ].map(({ color, label, desc }) => (
+              <div key={label} className="flex items-start gap-2">
+                <span className={`w-3 h-3 rounded-full ${color} flex-shrink-0 mt-1`} />
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">{label}</p>
+                  <p className="text-xs text-slate-500">{desc}</p>
+                </div>
               </div>
             ))}
           </div>

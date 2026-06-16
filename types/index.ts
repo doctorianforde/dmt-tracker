@@ -62,6 +62,14 @@ export interface CaseSections {
   references: boolean;
 }
 
+export interface SupervisorApproval {
+  approved: boolean;
+  approvedAt?: Date;
+  rejectedAt?: Date;
+  rejectionReason?: string;
+  notes?: string;
+}
+
 export interface CaseRecord {
   studentUid: string;
   studentName: string;
@@ -75,6 +83,9 @@ export interface CaseRecord {
   approvalStage?: ApprovalStage;
   supervisor1Name?: string;
   supervisor2Name?: string;
+  supervisor1Approval?: SupervisorApproval;
+  supervisor2Approval?: SupervisorApproval;
+  drpaulApproval?: SupervisorApproval;
   customDeadline?: string;
   extensionReason?: string;
   updatedAt?: Date | null;

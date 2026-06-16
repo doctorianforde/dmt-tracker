@@ -28,26 +28,38 @@ const STAGE_CONFIG: Record<ApprovalStage, { label: string; color: string; dot: s
   approved: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
 };
 
-function getNextStage(current: ApprovalStage, role: string): ApprovalStage | null {
+function getNextStage(current: ApprovalStage, role: string, supervisorApprovals: any): ApprovalStage | null {
   if (role === 'supervisor1') {
     if (current === 'pending') return 'supervisor1';
-    if (current === 'supervisor1') return 'supervisor2';
+    if (current === 'supervisor1' && supervisorApprovals?.supervisor1Approval?.approved) return 'supervisor2';
   }
   if (role === 'supervisor2') {
-    if (current === 'supervisor2') return 'drpaul';
+    if (current === 'supervisor2' && supervisorApprovals?.supervisor1Approval?.approved) return 'drpaul';
   }
   if (role === 'drpaul') {
-    if (current === 'drpaul') return 'approved';
-    if (current === 'pending' || current === 'supervisor1' || current === 'supervisor2') return 'approved';
+    if (current === 'drpaul' && supervisorApprovals?.supervisor2Approval?.approved) return 'approved';
   }
   return null;
 }
 
-function getStageButtonLabel(next: ApprovalStage): string {
-  if (next === 'supervisor1') return '🟠 Accept for Review';
-  if (next === 'supervisor2') return '🟡 Send to Sup. 2';
-  if (next === 'drpaul') return '🟡 Send to Dr. Paul';
-  if (next === 'approved') return '✅ Approve';
+function canApprove(stage: ApprovalStage, role: string, supervisorApprovals: any): boolean {
+  if (role === 'supervisor1') return stage === 'supervisor1' && !supervisorApprovals?.supervisor1Approval?.approved;
+  if (role === 'supervisor2') return stage === 'supervisor2' && !supervisorApprovals?.supervisor2Approval?.approved && supervisorApprovals?.supervisor1Approval?.approved;
+  if (role === 'drpaul') return stage === 'drpaul' && !supervisorApprovals?.drpaulApproval?.approved && supervisorApprovals?.supervisor1Approval?.approved && supervisorApprovals?.supervisor2Approval?.approved;
+  return false;
+}
+
+function getStageButtonLabel(next: ApprovalStage, role: string): string {
+  if (role === 'supervisor1') {
+    if (next === 'supervisor1') return '🟠 Accept for Review';
+    if (next === 'supervisor2') return '✅ Approve & Send to Sup. 2';
+  }
+  if (role === 'supervisor2') {
+    if (next === 'drpaul') return '🟡 Approve & Send to Dr. Paul';
+  }
+  if (role === 'drpaul') {
+    if (next === 'approved') return '✅ Grant Final Approval';
+  }
   return 'Advance';
 }
 
@@ -137,7 +149,8 @@ export default function CaseTable({ cases, isDrPaul = false, supervisorRole, onG
                 const stage: ApprovalStage = rec.approvalStage ?? (rec.greenLight ? 'approved' : 'pending');
                 const stageStyle = STAGE_CONFIG[stage];
                 const role = supervisorRole ?? (isDrPaul ? 'drpaul' : undefined);
-                const nextStage = role ? getNextStage(stage, role) : null;
+                const nextStage = role ? getNextStage(stage, role, rec) : null;
+                const canApproveCase = role ? canApprove(stage, role, rec) : false;
 
                 return (
                   <tr key={rec.caseNumber} className="hover:bg-slate-50/50 transition-colors">
@@ -188,13 +201,25 @@ export default function CaseTable({ cases, isDrPaul = false, supervisorRole, onG
                     {(supervisorRole || isDrPaul) && (
                       <td className="px-4 py-4 text-center">
                         <div className="flex flex-col items-center gap-1">
-                          {nextStage && (
+                          {stage === 'supervisor1' && rec.supervisor1Approval?.approved && (
+                            <span className="text-xs text-emerald-600 font-semibold">✅ Approved by Sup. 1</span>
+                          )}
+                          {stage === 'supervisor2' && rec.supervisor2Approval?.approved && (
+                            <span className="text-xs text-emerald-600 font-semibold">✅ Approved by Sup. 2</span>
+                          )}
+                          {stage === 'drpaul' && rec.drpaulApproval?.approved && (
+                            <span className="text-xs text-emerald-600 font-semibold">✅ Approved by Dr. Paul</span>
+                          )}
+                          {canApproveCase && nextStage && (
                             <button
                               onClick={() => onStageAdvance?.(rec.caseNumber, nextStage)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 whitespace-nowrap"
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 whitespace-nowrap"
                             >
-                              {getStageButtonLabel(nextStage)}
+                              {getStageButtonLabel(nextStage, role ?? 'supervisor1')}
                             </button>
+                          )}
+                          {!canApproveCase && stage !== 'pending' && stage !== 'approved' && (
+                            <span className="text-xs text-slate-400">Waiting for approval</span>
                           )}
                           {isDrPaul && stage === 'approved' && (
                             <button

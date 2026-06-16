@@ -72,6 +72,44 @@ export async function updateApprovalStage(
   });
 }
 
+export async function approveBySupervisor(
+  caseNumber: string,
+  supervisorRole: 'supervisor1' | 'supervisor2' | 'drpaul',
+  nextStage?: import('@/types').ApprovalStage
+): Promise<void> {
+  const db = getSafeDb();
+  const approvalKey = `${supervisorRole}Approval` as const;
+
+  await updateDoc(doc(db, 'cases', caseNumber), {
+    [approvalKey]: {
+      approved: true,
+      approvedAt: serverTimestamp(),
+    },
+    ...(nextStage ? { approvalStage: nextStage } : {}),
+    greenLight: nextStage === 'approved',
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function rejectBySupervisor(
+  caseNumber: string,
+  supervisorRole: 'supervisor1' | 'supervisor2' | 'drpaul',
+  reason: string
+): Promise<void> {
+  const db = getSafeDb();
+  const approvalKey = `${supervisorRole}Approval` as const;
+
+  await updateDoc(doc(db, 'cases', caseNumber), {
+    [approvalKey]: {
+      approved: false,
+      rejectedAt: serverTimestamp(),
+      rejectionReason: reason,
+    },
+    approvalStage: 'pending',
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function getAllCases(): Promise<CaseRecord[]> {
   const db = getSafeDb();
   const snap = await getDocs(collection(db, 'cases'));

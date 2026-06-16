@@ -131,7 +131,6 @@ function Dashboard() {
         greenLight: caseRecord?.greenLight ?? false,
         approvalStage: caseRecord?.approvalStage ?? 'pending',
         ...(supervisor1Name ? { supervisor1Name } : {}),
-        ...(supervisor2Name ? { supervisor2Name } : {}),
         ...(customDeadline ? { customDeadline } : {}),
         ...(extensionReason.trim() ? { extensionReason: extensionReason.trim() } : {}),
       };
@@ -336,31 +335,21 @@ function Dashboard() {
                 Leave blank to use the default deadline (June 30, 2026)
               </p>
             </div>
-            <div>
-              <label className={labelClass}>Supervisor 1</label>
+            <div className="sm:col-span-2">
+              <label className={labelClass}>Primary Supervisor (Supervisor 1)</label>
               <select
                 value={supervisor1Name}
                 onChange={(e) => setSupervisor1Name(e.target.value)}
                 className={`${inputClass} ${themeConfig.selectBg}`}
               >
-                <option value="">— Select supervisor —</option>
-                {SUPERVISORS.filter((s) => s !== supervisor2Name).map((s) => (
+                <option value="">— Select your primary supervisor —</option>
+                {SUPERVISORS.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className={labelClass}>Supervisor 2</label>
-              <select
-                value={supervisor2Name}
-                onChange={(e) => setSupervisor2Name(e.target.value)}
-                className={`${inputClass} ${themeConfig.selectBg}`}
-              >
-                <option value="">— Select supervisor —</option>
-                {SUPERVISORS.filter((s) => s !== supervisor1Name).map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <p className={`text-xs mt-1.5 ${themeConfig.mutedText}`}>
+                Submit your case to your primary supervisor. They will review and may assign a second supervisor if needed.
+              </p>
             </div>
           </div>
         </div>

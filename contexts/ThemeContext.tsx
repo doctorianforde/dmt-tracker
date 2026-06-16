@@ -2,23 +2,26 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import type { ThemeChoice, ThemeConfig, ThemeMarkers } from '@/types';
-import { THEMES, THEME_MARKERS, getSavedTheme, setSavedTheme, getThemeAspects } from '@/lib/themes';
+import { THEMES, THEME_MARKERS, getSavedTheme, setSavedTheme, getThemeAspects, getRandomQuote } from '@/lib/themes';
 
 interface ThemeContextType {
   currentTheme: ThemeChoice;
   themeConfig: ThemeConfig;
   themeMarkers: ThemeMarkers;
   switchTheme: (theme: ThemeChoice) => void;
+  activeQuote: string;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentTheme, setCurrentTheme] = useState<ThemeChoice>('light');
+  const [activeQuote, setActiveQuote] = useState<string>('');
 
   useEffect(() => {
     const saved = getSavedTheme();
     setCurrentTheme(saved);
+    setActiveQuote(getRandomQuote());
   }, []);
 
   useEffect(() => {
@@ -39,6 +42,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       themeConfig: themeAspects.config,
       themeMarkers: themeAspects.markers,
       switchTheme,
+      activeQuote,
     }}>
       {children}
     </ThemeContext.Provider>

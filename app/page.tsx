@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const { user, userProfile, signIn, signUp } = useAuth();
+  const { activeQuote } = useTheme();
   const router = useRouter();
 
   useEffect(() => {
@@ -96,6 +98,17 @@ export default function LoginPage() {
               <span className="text-white text-xs font-bold">VIS</span>
             </div>
             <span className="font-semibold text-slate-800">VIS</span>
+          </div>
+
+          {/* Motivational Quote Banner */}
+          <div className="mb-8 p-6 rounded-xl shadow-lg backdrop-blur-sm border border-sky-200 bg-gradient-to-br from-sky-50 to-blue-50 transition-all duration-300 hover:shadow-xl hover:scale-[1.02]">
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-4xl opacity-40">"</span>
+              <p className="text-center text-sm md:text-base italic font-medium leading-relaxed text-slate-800">
+                {activeQuote}
+              </p>
+              <span className="text-4xl opacity-40">"</span>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">

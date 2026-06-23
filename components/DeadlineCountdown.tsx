@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { DEFAULT_DEADLINE } from '@/lib/config';
 
-const DEFAULT_DEADLINE = new Date('2026-06-30T23:59:59');
+const DEFAULT_DEADLINE_DATE = new Date(`${DEFAULT_DEADLINE}T23:59:59`);
 
 interface Props {
   customDeadline?: string;   // ISO date string e.g. "2026-06-30"
@@ -11,7 +12,7 @@ interface Props {
 }
 
 function getDaysUntilDeadline(customDeadline: string | undefined, now: number) {
-  const deadline = customDeadline ? new Date(customDeadline + 'T23:59:59') : DEFAULT_DEADLINE;
+  const deadline = customDeadline ? new Date(customDeadline + 'T23:59:59') : DEFAULT_DEADLINE_DATE;
   const diff = deadline.getTime() - now;
   const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
   let urgency: 'critical' | 'warning' | 'ok' = 'ok';

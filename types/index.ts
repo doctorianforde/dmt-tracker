@@ -77,11 +77,11 @@ export interface CaseRecord {
   startYear: number;
   classYear: number;
   sections: CaseSections;
-  submitted: boolean;
-  documentLink?: string;
   greenLight: boolean;
   approvalStage?: ApprovalStage;
+  supervisor1Uid?: string;
   supervisor1Name?: string;
+  supervisor2Uid?: string;
   supervisor2Name?: string;
   supervisor1Approval?: SupervisorApproval;
   supervisor2Approval?: SupervisorApproval;

@@ -191,6 +191,7 @@ function Dashboard() {
             cases={cases}
             isDrPaul={isDrPaul}
             isSupervisor={isSupervisor}
+            supervisorUid={userProfile?.uid}
             supervisorName={userProfile?.name}
             onApprove={handleApprove}
             onRevoke={handleRevoke}

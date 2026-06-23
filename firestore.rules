@@ -28,7 +28,9 @@ service cloud.firestore {
 
     // ── Users ────────────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if request.auth.uid == userId || isStaff();
+      // All authenticated users can read user profiles so students can discover supervisors.
+      // In a stricter deployment, expose supervisors through a dedicated public collection.
+      allow read: if isAuthed();
 
       allow create: if request.auth.uid == userId
         && request.resource.data.role in ['student', 'supervisor', 'drpaul'];
@@ -51,15 +53,23 @@ service cloud.firestore {
 
       // Privileged fields that students can never modify
       function protectedCaseFields() {
-        return ['greenLight', 'approvalStage', 'submitted',
-                'supervisor1Approval', 'supervisor2Approval', 'drpaulApproval'];
+        return ['greenLight', 'supervisor1Approval', 'supervisor2Approval', 'drpaulApproval'];
+      }
+
+      function studentCanUpdateCase() {
+        const affected = request.resource.data.diff(resource.data).affectedKeys();
+        if (affected.hasAny(protectedCaseFields())) return false;
+        if (!affected.hasAny(['approvalStage'])) return true;
+        // Students may submit their case (pending -> supervisor1) but cannot change other stages.
+        return resource.data.approvalStage == 'pending'
+          && request.resource.data.approvalStage == 'supervisor1';
       }
 
       allow update: if
-        // Students can update their own case content but cannot touch approval state
+        // Students can update their own case content and submit for review
         (isStudent()
           && resource.data.studentUid == request.auth.uid
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedCaseFields()))
+          && studentCanUpdateCase())
         ||
         // Supervisors can record their own approval and advance the stage
         (isSupervisor()

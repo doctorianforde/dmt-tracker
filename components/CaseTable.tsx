@@ -7,9 +7,21 @@ interface Props {
   cases: CaseRecord[];
   isDrPaul?: boolean;
   isSupervisor?: boolean;
+  supervisorUid?: string;
   supervisorName?: string;
   onApprove?: (caseNumber: string, role: 'supervisor1' | 'supervisor2' | 'drpaul', nextStage: ApprovalStage) => void;
   onRevoke?: (caseNumber: string) => void;
+}
+
+// Backward-compatible matching: prefer UID, fall back to display name for legacy cases.
+function isAssignedSupervisor1(record: CaseRecord, supervisorUid?: string, supervisorName?: string) {
+  if (supervisorUid && record.supervisor1Uid) return record.supervisor1Uid === supervisorUid;
+  return !!supervisorName && record.supervisor1Name === supervisorName;
+}
+
+function isAssignedSupervisor2(record: CaseRecord, supervisorUid?: string, supervisorName?: string) {
+  if (supervisorUid && record.supervisor2Uid) return record.supervisor2Uid === supervisorUid;
+  return !!supervisorName && record.supervisor2Name === supervisorName;
 }
 
 const SECTION_KEYS = ['intro', 'caseReport', 'discussion', 'conclusion', 'references'] as const;
@@ -33,18 +45,18 @@ function getNextStage(
   current: ApprovalStage,
   isSupervisor: boolean,
   isDrPaul: boolean,
+  supervisorUid: string | undefined,
   supervisorName: string | undefined,
   record: CaseRecord
 ): ApprovalStage | null {
-  // Check if supervisor is assigned to this case
-  if (isSupervisor && supervisorName) {
-    const isSupervisor1 = record.supervisor1Name === supervisorName;
-    const isSupervisor2 = record.supervisor2Name === supervisorName;
+  if (isSupervisor) {
+    const sup1 = isAssignedSupervisor1(record, supervisorUid, supervisorName);
+    const sup2 = isAssignedSupervisor2(record, supervisorUid, supervisorName);
 
-    if (isSupervisor1 && current === 'supervisor1' && !record.supervisor1Approval?.approved) {
-      return 'supervisor2';
+    if (sup1 && current === 'supervisor1' && !record.supervisor1Approval?.approved) {
+      return record.supervisor2Uid || record.supervisor2Name ? 'supervisor2' : 'drpaul';
     }
-    if (isSupervisor2 && current === 'supervisor2' && !record.supervisor2Approval?.approved && record.supervisor1Approval?.approved) {
+    if (sup2 && current === 'supervisor2' && !record.supervisor2Approval?.approved && record.supervisor1Approval?.approved) {
       return 'drpaul';
     }
   }
@@ -60,15 +72,16 @@ function canApprove(
   stage: ApprovalStage,
   isSupervisor: boolean,
   isDrPaul: boolean,
+  supervisorUid: string | undefined,
   supervisorName: string | undefined,
   record: CaseRecord
 ): boolean {
-  if (isSupervisor && supervisorName) {
-    const isSupervisor1 = record.supervisor1Name === supervisorName;
-    const isSupervisor2 = record.supervisor2Name === supervisorName;
+  if (isSupervisor) {
+    const sup1 = isAssignedSupervisor1(record, supervisorUid, supervisorName);
+    const sup2 = isAssignedSupervisor2(record, supervisorUid, supervisorName);
 
-    if (isSupervisor1 && stage === 'supervisor1' && !record.supervisor1Approval?.approved) return true;
-    if (isSupervisor2 && stage === 'supervisor2' && !record.supervisor2Approval?.approved && record.supervisor1Approval?.approved) return true;
+    if (sup1 && stage === 'supervisor1' && !record.supervisor1Approval?.approved) return true;
+    if (sup2 && stage === 'supervisor2' && !record.supervisor2Approval?.approved && record.supervisor1Approval?.approved) return true;
   }
 
   if (isDrPaul && stage === 'drpaul' && !record.drpaulApproval?.approved && record.supervisor1Approval?.approved && record.supervisor2Approval?.approved) {
@@ -78,9 +91,9 @@ function canApprove(
   return false;
 }
 
-function getStageButtonLabel(next: ApprovalStage, supervisorName: string | undefined, record: CaseRecord): string {
-  const isSupervisor1 = record.supervisor1Name === supervisorName;
-  const isSupervisor2 = record.supervisor2Name === supervisorName;
+function getStageButtonLabel(next: ApprovalStage, supervisorUid: string | undefined, supervisorName: string | undefined, record: CaseRecord): string {
+  const isSupervisor1 = isAssignedSupervisor1(record, supervisorUid, supervisorName);
+  const isSupervisor2 = isAssignedSupervisor2(record, supervisorUid, supervisorName);
 
   if (isSupervisor1) {
     if (next === 'supervisor2') return '✅ Approve & Send to Sup. 2';
@@ -94,7 +107,7 @@ function getStageButtonLabel(next: ApprovalStage, supervisorName: string | undef
   return 'Advance';
 }
 
-export default function CaseTable({ cases, isDrPaul = false, isSupervisor = false, supervisorName, onApprove, onRevoke }: Props) {
+export default function CaseTable({ cases, isDrPaul = false, isSupervisor = false, supervisorUid, supervisorName, onApprove, onRevoke }: Props) {
   const [search, setSearch] = useState('');
 
   const filtered = cases.filter(
@@ -106,7 +119,6 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
   const totalComplete = cases.filter((c) =>
     Object.values(c.sections).every(Boolean)
   ).length;
-  const totalSubmitted = cases.filter((c) => c.submitted).length;
   const totalGreenLights = cases.filter((c) => c.greenLight).length;
 
   if (cases.length === 0) {
@@ -122,7 +134,7 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
   return (
     <div className="space-y-5">
       {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="bg-white border border-slate-200 rounded-xl p-4">
           <p className="text-3xl font-bold text-slate-900">{cases.length}</p>
           <p className="text-xs text-slate-500 mt-1">Total Cases</p>
@@ -130,10 +142,6 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
         <div className="bg-violet-50 border border-violet-100 rounded-xl p-4">
           <p className="text-3xl font-bold text-violet-700">{totalComplete}</p>
           <p className="text-xs text-violet-500 mt-1">All Sections Done</p>
-        </div>
-        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-          <p className="text-3xl font-bold text-amber-700">{totalSubmitted}</p>
-          <p className="text-xs text-amber-500 mt-1">Documents Linked</p>
         </div>
         <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
           <p className="text-3xl font-bold text-emerald-700">{totalGreenLights}</p>
@@ -181,8 +189,8 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
                 const completedCount = Object.values(rec.sections).filter(Boolean).length;
                 const stage: ApprovalStage = rec.approvalStage ?? (rec.greenLight ? 'approved' : 'pending');
                 const stageStyle = STAGE_CONFIG[stage];
-                const nextStage = getNextStage(stage, isSupervisor, isDrPaul, supervisorName, rec);
-                const canApproveCase = canApprove(stage, isSupervisor, isDrPaul, supervisorName, rec);
+                const nextStage = getNextStage(stage, isSupervisor, isDrPaul, supervisorUid, supervisorName, rec);
+                const canApproveCase = canApprove(stage, isSupervisor, isDrPaul, supervisorUid, supervisorName, rec);
 
                 return (
                   <tr key={rec.caseNumber} className="hover:bg-slate-50/50 transition-colors">
@@ -247,14 +255,14 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
                               onClick={() => {
                                 const role = isDrPaul
                                   ? 'drpaul'
-                                  : rec.supervisor1Name === supervisorName
+                                  : isAssignedSupervisor1(rec, supervisorUid, supervisorName)
                                   ? 'supervisor1'
                                   : 'supervisor2';
                                 onApprove?.(rec.caseNumber, role, nextStage);
                               }}
                               className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 whitespace-nowrap"
                             >
-                              {getStageButtonLabel(nextStage, supervisorName, rec)}
+                              {getStageButtonLabel(nextStage, supervisorUid, supervisorName, rec)}
                             </button>
                           )}
                           {!canApproveCase && stage !== 'pending' && stage !== 'approved' && (

@@ -7,7 +7,7 @@
 3. Enable these services:
    - **Authentication** → Email/Password sign-in
    - **Firestore Database** → Start in Production mode
-   - **Storage** → Default bucket
+   - **Storage** → Default bucket (optional — only needed if file uploads are enabled)
 
 ## 2. Firebase Config
 
@@ -23,13 +23,20 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
 NEXT_PUBLIC_FIREBASE_APP_ID=...
 ```
 
+3. Add invite codes for supervisor sign-up:
+
+```
+NEXT_PUBLIC_CODE_SUPERVISOR=your-supervisor-invite-code
+NEXT_PUBLIC_CODE_DRPAUL=your-drpaul-invite-code
+```
+
 ## 3. Firestore Security Rules
 
 In Firebase Console → Firestore → Rules, paste the contents of `firestore.rules`.
 
 ## 4. Storage CORS (for file uploads)
 
-In Firebase Console → Storage → Rules, use:
+If you enable file uploads, in Firebase Console → Storage → Rules, use:
 
 ```
 rules_version = '2';
@@ -45,21 +52,13 @@ service firebase.storage {
 
 ## 5. Create Supervisor Accounts
 
-Supervisor accounts must be created manually (students self-register):
+Supervisor accounts must be created via `/supervisor-signup` (students self-register on `/`):
 
-1. Go to Firebase Console → Authentication → Add user
-2. Enter the supervisor's email and a temporary password
-3. Go to Firestore → `users` collection → Create a document with the user's UID:
+1. Go to `http://localhost:3000/supervisor-signup`
+2. Fill in the supervisor's name, email, password, and the `NEXT_PUBLIC_CODE_SUPERVISOR` invite code
+3. Repeat for Dr. Paul using the `NEXT_PUBLIC_CODE_DRPAUL` code
 
-```json
-{
-  "name": "Dr. Paul",
-  "email": "drpaul@university.edu",
-  "role": "drpaul"
-}
-```
-
-Valid roles: `student`, `supervisor1`, `supervisor2`, `drpaul`
+Valid roles in Firestore are: `student`, `supervisor`, `drpaul`.
 
 ## 6. Local Development
 
@@ -69,6 +68,15 @@ npm install
 cp .env.local.example .env.local
 # Fill in your Firebase values in .env.local
 npm run dev
+```
+
+Available scripts:
+
+```bash
+npm run dev      # Start development server
+npm run build    # Production build
+npm run lint     # ESLint
+npm run test     # Vitest
 ```
 
 ## 7. Deploy to Vercel
@@ -82,7 +90,6 @@ npm run dev
 
 | Role | Login | Can Do |
 |------|-------|--------|
-| Student | Self-register | View/edit own profile, track sections, upload file |
-| Supervisor 1 | Admin-created | View all student cases (read-only) |
-| Supervisor 2 | Admin-created | View all student cases (read-only) |
-| Dr. Paul | Admin-created | View all cases + give/revoke Green Light |
+| Student | Self-register on `/` | View/edit own profile and case, select supervisors, submit for review |
+| Supervisor | Sign up via `/supervisor-signup` | View all cases, approve cases assigned by students |
+| Dr. Paul | Sign up via `/supervisor-signup` | View all cases, grant/revoke final approval |

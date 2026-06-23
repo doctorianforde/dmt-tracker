@@ -219,10 +219,8 @@ Dr. Paul sees:
 
 ## Next Steps
 
-The approval action buttons are now in place. The next implementation step would be:
-
-1. Wire up the approve/reject button handlers
-2. Add notes/feedback field when approving
-3. Send notifications when case advances
-4. Add audit log for tracking changes
+1. ~~**Wire up the approve/reject button handlers**~~ ✅ Completed — approvals record per-supervisor objects with timestamps via `approveCase()`
+2. **Add rejection UI** — Add a feedback field and wire the existing `rejectCase()` helper
+3. **Send notifications** — Email supervisors when cases arrive/advance
+4. **Add audit log** — Track all approval/revoke actions in a dedicated collection
 

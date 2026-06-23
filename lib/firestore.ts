@@ -9,7 +9,7 @@ import {
   type DocumentData,
 } from 'firebase/firestore';
 import { getSafeDb } from './firebase';
-import type { UserProfile, CaseRecord, ApprovalStage, SupervisorApproval } from '@/types';
+import type { UserProfile, CaseRecord, ApprovalStage, SupervisorApproval, UserRole } from '@/types';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -64,6 +64,15 @@ export async function updateUserProfile(uid: string, data: Partial<UserProfile>)
   await updateDoc(doc(db, 'users', uid), data as Record<string, unknown>);
 }
 
+export async function getUsersByRole(role: UserRole): Promise<UserProfile[]> {
+  const db = getSafeDb();
+  const snap = await getDocs(collection(db, 'users'));
+  return snap.docs
+    .map((d) => ({ uid: d.id, ...d.data() } as UserProfile))
+    .filter((u) => u.role === role)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 // ── Case Records ────────────────────────────────────────────────────────────
 
 export async function getCaseRecord(caseNumber: string): Promise<CaseRecord | null> {
@@ -83,6 +92,14 @@ export async function saveCaseRecord(
     { ...data, updatedAt: serverTimestamp() },
     { merge: true }
   );
+}
+
+export async function submitCaseForReview(caseNumber: string): Promise<void> {
+  const db = getSafeDb();
+  await updateDoc(doc(db, 'cases', caseNumber), {
+    approvalStage: 'supervisor1',
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function approveCase(

@@ -1,52 +1,54 @@
 # Supervisor Dashboard Testing Guide
 
-## Your Invite Codes (from .env.local)
+## Your Invite Codes (from `.env.local`)
 
 ```
-SUPERVISOR 1: sup1-change-me
-SUPERVISOR 2: sup2-change-me
-DR. PAUL:     drpaul-change-me
+SUPERVISOR:   supervisor-secret-code
+DR. PAUL:     drpaul-secret-code
 ```
 
 ---
 
 ## Step 1: Create Supervisor Accounts
 
-### Create Supervisor 1
-1. Go to `http://localhost:3000/supervisor-signup`
-2. Click "Supervisor 1" role
-3. Fill in:
-   - **Full Name**: `Dr. Davin Powdhar`
-   - **Email**: `supervisor1@test.edu`
-   - **Password**: `Test1234!`
-   - **Invite Code**: `sup1-change-me`
-4. Click "Create Supervisor Account"
+### Create Supervisors
 
-### Create Supervisor 2
+All supervisors use the **same** invite code at signup:
+
 1. Go to `http://localhost:3000/supervisor-signup`
-2. Click "Supervisor 2" role
-3. Fill in:
-   - **Full Name**: `Dr. Windale`
-   - **Email**: `supervisor2@test.edu`
+2. Fill in:
+   - **Full Name**: `Dr. [Name]`
+   - **Email**: `supervisor@test.edu`
    - **Password**: `Test1234!`
-   - **Invite Code**: `sup2-change-me`
-4. Click "Create Supervisor Account"
+   - **Invite Code**: `supervisor-secret-code`
+3. Click "Create Supervisor Account"
+
+**Example Supervisors:**
+```
+Dr. Davin Powdhar (supervisor1@test.edu)
+Dr. Windale (supervisor2@test.edu)
+Dr. Sally (supervisor3@test.edu)
+Dr. Kyle (supervisor4@test.edu)
+```
 
 ### Create Dr. Paul
+
+Dr. Paul has a separate invite code:
+
 1. Go to `http://localhost:3000/supervisor-signup`
-2. Click "Dr. Paul (Lead Supervisor)" role
-3. Fill in:
+2. Fill in:
    - **Full Name**: `Dr. Paul`
    - **Email**: `drpaul@test.edu`
    - **Password**: `Test1234!`
-   - **Invite Code**: `drpaul-change-me`
-4. Click "Create Supervisor Account"
+   - **Invite Code**: `drpaul-secret-code`
+3. Click "Create Supervisor Account"
 
 ---
 
 ## Step 2: Create Student Accounts
 
 ### Create Student 1 (Pending Status)
+
 1. Go to `http://localhost:3000/`
 2. Sign up with:
    - **Email**: `student1@test.edu`
@@ -61,6 +63,7 @@ DR. PAUL:     drpaul-change-me
 6. Click "Save Progress"
 
 ### Create Student 2 (Supervisor 1 Review)
+
 1. Go to `http://localhost:3000/`
 2. Sign up with:
    - **Email**: `student2@test.edu`
@@ -70,10 +73,13 @@ DR. PAUL:     drpaul-change-me
    - **Start Year**: `2024`
    - **Class Year**: `4`
    - **Primary Supervisor**: `Dr. Davin Powdhar`
+   - **Secondary Supervisor**: `Dr. Windale`
 4. In "Case Sections": Check **ALL** sections (5/5) ✅
 5. Click "Save Progress"
+6. Click **Submit for Review**
 
 ### Create Student 3 (Supervisor 2 Review)
+
 1. Go to `http://localhost:3000/`
 2. Sign up with:
    - **Email**: `student3@test.edu`
@@ -83,10 +89,14 @@ DR. PAUL:     drpaul-change-me
    - **Start Year**: `2024`
    - **Class Year**: `3`
    - **Primary Supervisor**: `Dr. Davin Powdhar`
+   - **Secondary Supervisor**: `Dr. Windale`
 4. In "Case Sections": Check **ALL** sections (5/5) ✅
 5. Click "Save Progress"
+6. Click **Submit for Review**
+7. Sign in as **Dr. Davin Powdhar** and approve the case
 
 ### Create Student 4 (Dr. Paul Review)
+
 1. Go to `http://localhost:3000/`
 2. Sign up with:
    - **Email**: `student4@test.edu`
@@ -96,69 +106,16 @@ DR. PAUL:     drpaul-change-me
    - **Start Year**: `2024`
    - **Class Year**: `3`
    - **Primary Supervisor**: `Dr. Davin Powdhar`
+   - **Secondary Supervisor**: `Dr. Windale`
 4. In "Case Sections": Check **ALL** sections (5/5) ✅
 5. Click "Save Progress"
+6. Click **Submit for Review**
+7. Sign in as **Dr. Davin Powdhar** and approve the case
+8. Sign in as **Dr. Windale** and approve the case
 
 ---
 
-## Step 3: Set Case Approval Stages in Firebase
-
-You need to manually update the Firestore database to show different approval stages:
-
-### Firebase Console Setup
-
-1. Go to [Firebase Console](https://console.firebase.google.com)
-2. Select your project
-3. Go to **Firestore Database** → **Collections** → **cases**
-
-### Case 1: DMT-2024-001 (Pending)
-- **approvalStage**: `pending`
-- (Leave other approval fields empty)
-
-### Case 2: DMT-2024-002 (Supervisor 1 Review)
-- **approvalStage**: `supervisor1`
-- **supervisor1Approval**: Add this object:
-  ```
-  {
-    approved: false
-  }
-  ```
-- Add fields: **supervisor1Name**: `Dr. Davin Powdhar`
-
-### Case 3: DMT-2024-003 (Supervisor 2 Review)
-- **approvalStage**: `supervisor2`
-- **supervisor1Approval**: 
-  ```
-  {
-    approved: true,
-    approvedAt: (set to 2 days ago)
-  }
-  ```
-- **supervisor1Name**: `Dr. Davin Powdhar`
-- **supervisor2Name**: `Dr. Windale`
-
-### Case 4: DMT-2024-004 (Dr. Paul Review)
-- **approvalStage**: `drpaul`
-- **supervisor1Approval**:
-  ```
-  {
-    approved: true,
-    approvedAt: (set to 3 days ago)
-  }
-  ```
-- **supervisor2Approval**:
-  ```
-  {
-    approved: true,
-    approvedAt: (set to 1 day ago)
-  }
-  ```
-- **supervisor1Name**: `Dr. Davin Powdhar`
-- **supervisor2Name**: `Dr. Windale`
-
----
-
-## Step 4: Test the Supervisor Dashboard
+## Step 3: Test the Supervisor Dashboard
 
 ### Test as Supervisor 1
 
@@ -168,13 +125,11 @@ You need to manually update the Firestore database to show different approval st
 2. You're redirected to `/supervisor` dashboard
 3. You should see:
 
-   **Header Banner** (Orange):
-   - "Supervisor 1 — Primary Reviewer"
-   - Description of your responsibilities
+   **Header Banner**: Generic Supervisor banner with your responsibilities
 
    **Case Table** showing 4 students:
-   - **DMT-2024-001** (Alice): Gray pending status
-   - **DMT-2024-002** (Bob): Orange "Supervisor 1" status with **🟠 ACCEPT FOR REVIEW** button
+   - **DMT-2024-001** (Alice): Gray pending status, no action button
+   - **DMT-2024-002** (Bob): Orange "Supervisor 1" status with approval button
    - **DMT-2024-003** (Carol): Amber status, showing "✅ Approved by Sup. 1"
    - **DMT-2024-004** (David): Yellow status, showing "✅ Approved by Sup. 1"
 
@@ -188,13 +143,11 @@ You need to manually update the Firestore database to show different approval st
 2. Go to `/supervisor` dashboard
 3. You should see:
 
-   **Header Banner** (Amber):
-   - "Supervisor 2 — Secondary Reviewer"
-   - Description of your role
+   **Header Banner**: Generic Supervisor banner
 
    **Case Table**:
    - **DMT-2024-001 & 002**: No action buttons (not at your stage)
-   - **DMT-2024-003** (Carol): Amber "Supervisor 2" status with **🟡 APPROVE & SEND TO DR. PAUL** button
+   - **DMT-2024-003** (Carol): Amber "Supervisor 2" status with approval button
    - **DMT-2024-004** (David): Yellow status, showing "✅ Approved by Sup. 2"
 
 ---
@@ -207,24 +160,22 @@ You need to manually update the Firestore database to show different approval st
 2. Go to `/supervisor` dashboard
 3. You should see:
 
-   **Header Banner** (Green):
-   - "Dr. Paul — Lead Supervisor"
-   - Information about final approval authority
+   **Header Banner**: Green "Dr. Paul — Lead Supervisor" banner
 
    **Case Table**:
    - **DMT-2024-001, 002, 003**: No action buttons (both supervisors haven't approved)
-   - **DMT-2024-004** (David): Yellow "Dr. Paul" status with **✅ GRANT FINAL APPROVAL** button
+   - **DMT-2024-004** (David): Yellow "Dr. Paul" status with **✅ Grant Final Approval** button
 
 ---
 
 ## What the Tiered System Enforces
 
 ✅ **Supervisor 1 Must Approve First**
-- Only Supervisor 1 can approve cases in the "supervisor1" stage
+- Only the assigned Supervisor 1 can approve cases in the "supervisor1" stage
 - Case cannot move to "supervisor2" without Supervisor 1's approval
 
 ✅ **Supervisor 2 Requires Prior Approval**
-- Supervisor 2 can only see approval buttons for cases Supervisor 1 already approved
+- Only the assigned Supervisor 2 can see approval buttons for cases Supervisor 1 already approved
 - Case cannot move to "drpaul" without Supervisor 2's approval
 
 ✅ **Dr. Paul Requires Both Approvals**
@@ -233,7 +184,7 @@ You need to manually update the Firestore database to show different approval st
 
 ✅ **All Supervisors See All Cases**
 - Every supervisor role can see all student cases
-- They just can only act on cases at their approval stage
+- They just can only act on cases they are assigned to
 
 ---
 
@@ -241,7 +192,7 @@ You need to manually update the Firestore database to show different approval st
 
 | Stage | Color | Icon | Meaning |
 |-------|-------|------|---------|
-| `pending` | Gray | ◇ | Awaiting Supervisor 1 review |
+| `pending` | Gray | ◇ | Awaiting student submission |
 | `supervisor1` | Orange | 🟠 | Awaiting Supervisor 1 approval |
 | `supervisor2` | Amber | 🟡 | Supervisor 1 approved, awaiting Supervisor 2 |
 | `drpaul` | Yellow | 🔆 | Both supervisors approved, awaiting Dr. Paul |
@@ -258,6 +209,7 @@ You need to manually update the Firestore database to show different approval st
 **Q: The approve buttons don't show**
 - Check the `approvalStage` in Firestore matches the logic
 - Verify `supervisor1Approval.approved` is `true` for Supervisor 2 to see buttons
+- Verify `supervisor1Uid`/`supervisor2Uid` match the signed-in supervisor's UID
 
 **Q: Cases aren't appearing**
 - Make sure you saved the student profile (saves to Firestore)
@@ -267,4 +219,3 @@ You need to manually update the Firestore database to show different approval st
 - Delete the test user accounts from Firebase Auth
 - Delete the case records from Firestore
 - Start from Step 1 again
-

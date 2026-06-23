@@ -8,11 +8,14 @@ import DeadlineCountdown from '@/components/DeadlineCountdown';
 import ProgressChecklist from '@/components/ProgressChecklist';
 import {
   getCaseRecord,
+  getUsersByRole,
   saveCaseRecord,
+  submitCaseForReview,
   updateUserProfile,
 } from '@/lib/firestore';
-import type { CaseRecord, CaseSections, ApprovalStage, ThemeChoice } from '@/types';
+import type { CaseRecord, CaseSections, ApprovalStage, ThemeChoice, UserProfile } from '@/types';
 import { THEMES, THEME_ORDER } from '@/lib/themes';
+import { DEFAULT_DEADLINE, START_YEAR_MIN, START_YEAR_MAX, CLASS_YEARS, SUPERVISORS } from '@/lib/config';
 
 const DEFAULT_SECTIONS: CaseSections = {
   intro: false,
@@ -37,26 +40,7 @@ const PIPELINE_STEPS: { stage: ApprovalStage; label: string; color: string }[] =
   { stage: 'approved', label: 'Approved', color: 'bg-emerald-500' },
 ];
 
-export const SUPERVISORS = [
-  'Dr. Davin Powdhar',
-  'Dr. Windale',
-  'Dr. Jenna',
-  'Dr. Sally',
-  'Dr. Kyle',
-  'Dr. Ian',
-  'Dr. Sammy',
-  'Dr. Saleem Varachhia',
-  'Dr. Arvind Ramnarine',
-  'Dr. Jason Ettienne',
-  'Dr. Latoya Baptiste-Manzano',
-  'Dr. Zada',
-  'Dr. Saif',
-  'Dr. Steve',
-  'Dr. Robert',
-  'Dr. Emerald',
-  'Dr. Romel',
-  'Dr. Sunita',
-];
+export { SUPERVISORS };
 
 export default function StudentDashboard() {
   return (
@@ -73,6 +57,7 @@ function Dashboard() {
   const [dataLoading, setDataLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   const [caseNumber, setCaseNumber] = useState('');
@@ -80,8 +65,33 @@ function Dashboard() {
   const [classYear, setClassYear] = useState(1);
   const [customDeadline, setCustomDeadline] = useState('');
   const [sections, setSections] = useState<CaseSections>(DEFAULT_SECTIONS);
+  const [supervisor1Uid, setSupervisor1Uid] = useState('');
   const [supervisor1Name, setSupervisor1Name] = useState('');
+  const [supervisor2Uid, setSupervisor2Uid] = useState('');
   const [supervisor2Name, setSupervisor2Name] = useState('');
+  const [supervisors, setSupervisors] = useState<UserProfile[]>([]);
+
+  const supervisorOptions = supervisors.length > 0
+    ? supervisors
+    : SUPERVISORS.map((name) => ({ uid: name, name }));
+
+  const getSupervisorName = (uid: string) =>
+    supervisorOptions.find((s) => s.uid === uid)?.name ?? '';
+
+  const handleSupervisor1Change = (uid: string) => {
+    setSupervisor1Uid(uid);
+    setSupervisor1Name(getSupervisorName(uid));
+    if (supervisor2Uid === uid) {
+      setSupervisor2Uid('');
+      setSupervisor2Name('');
+    }
+  };
+
+  const handleSupervisor2Change = (uid: string) => {
+    setSupervisor2Uid(uid);
+    setSupervisor2Name(getSupervisorName(uid));
+  };
+
   const [extensionReason, setExtensionReason] = useState('');
   const [showExtension, setShowExtension] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>('light');
@@ -94,6 +104,12 @@ function Dashboard() {
       if (!user || !userProfile) return;
       try {
         if (userProfile.theme) setTheme(userProfile.theme);
+
+        const [supervisorList] = await Promise.all([
+          getUsersByRole('supervisor').catch(() => []),
+        ]);
+        setSupervisors(supervisorList);
+
         if (userProfile.caseNumber) {
           setCaseNumber(userProfile.caseNumber);
           setStartYear(userProfile.startYear ?? new Date().getFullYear());
@@ -102,7 +118,9 @@ function Dashboard() {
           if (rec) {
             setCaseRecord(rec);
             setSections(rec.sections ?? DEFAULT_SECTIONS);
+            setSupervisor1Uid(rec.supervisor1Uid ?? '');
             setSupervisor1Name(rec.supervisor1Name ?? '');
+            setSupervisor2Uid(rec.supervisor2Uid ?? '');
             setSupervisor2Name(rec.supervisor2Name ?? '');
             setCustomDeadline(rec.customDeadline ?? '');
             setExtensionReason(rec.extensionReason ?? '');
@@ -123,6 +141,21 @@ function Dashboard() {
     setTimeout(() => setSaveMessage(null), 4000);
   };
 
+  const handleSubmitForReview = async () => {
+    if (!userProfile?.caseNumber) return;
+    setSubmitting(true);
+    try {
+      await submitCaseForReview(userProfile.caseNumber);
+      setCaseRecord((prev) => (prev ? { ...prev, approvalStage: 'supervisor1' } : prev));
+      showMessage('Case submitted for review! 🎉', true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      showMessage('Submission failed: ' + msg, false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!user || !userProfile || !caseNumber.trim()) return;
     setSaving(true);
@@ -134,11 +167,10 @@ function Dashboard() {
         startYear,
         classYear,
         sections,
-        submitted: false,
         greenLight: caseRecord?.greenLight ?? false,
         approvalStage: caseRecord?.approvalStage ?? 'pending',
-        ...(supervisor1Name ? { supervisor1Name } : {}),
-        ...(supervisor2Name ? { supervisor2Name } : {}),
+        ...(supervisor1Uid ? { supervisor1Uid, supervisor1Name } : {}),
+        ...(supervisor2Uid ? { supervisor2Uid, supervisor2Name } : {}),
         ...(customDeadline ? { customDeadline } : {}),
         ...(extensionReason.trim() ? { extensionReason: extensionReason.trim() } : {}),
       };
@@ -197,7 +229,7 @@ function Dashboard() {
   const stageInfo = STAGE_CONFIG[approvalStage];
 
   // Check if deadline is within 30 days
-  const deadlineDate = customDeadline ? new Date(customDeadline + 'T23:59:59') : new Date('2026-06-30T23:59:59');
+  const deadlineDate = customDeadline ? new Date(customDeadline + 'T23:59:59') : new Date(`${DEFAULT_DEADLINE}T23:59:59`);
   const daysLeft = Math.ceil((deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   const deadlineUrgent = daysLeft <= 30;
 
@@ -331,8 +363,8 @@ function Dashboard() {
                 type="number"
                 value={startYear}
                 onChange={(e) => setStartYear(Number(e.target.value))}
-                min={2018}
-                max={2030}
+                min={START_YEAR_MIN}
+                max={START_YEAR_MAX}
                 className={inputClass}
               />
             </div>
@@ -343,7 +375,7 @@ function Dashboard() {
                 onChange={(e) => setClassYear(Number(e.target.value))}
                 className={`${inputClass} ${themeConfig.selectBg}`}
               >
-                {[1, 2, 3, 4, 5].map((y) => (
+                {CLASS_YEARS.map((y) => (
                   <option key={y} value={y}>Year {y}</option>
                 ))}
               </select>
@@ -363,13 +395,13 @@ function Dashboard() {
             <div className="sm:col-span-2">
               <label className={labelClass}>Primary Supervisor (Supervisor 1)</label>
               <select
-                value={supervisor1Name}
-                onChange={(e) => setSupervisor1Name(e.target.value)}
+                value={supervisor1Uid}
+                onChange={(e) => handleSupervisor1Change(e.target.value)}
                 className={`${inputClass} ${themeConfig.selectBg}`}
               >
                 <option value="">— Select your primary supervisor —</option>
-                {SUPERVISORS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                {supervisorOptions.map((s) => (
+                  <option key={s.uid} value={s.uid}>{s.name}</option>
                 ))}
               </select>
               <p className={`text-xs mt-1.5 ${themeConfig.mutedText}`}>
@@ -379,14 +411,16 @@ function Dashboard() {
             <div className="sm:col-span-2">
               <label className={labelClass}>Secondary Supervisor (Supervisor 2)</label>
               <select
-                value={supervisor2Name}
-                onChange={(e) => setSupervisor2Name(e.target.value)}
+                value={supervisor2Uid}
+                onChange={(e) => handleSupervisor2Change(e.target.value)}
                 className={`${inputClass} ${themeConfig.selectBg}`}
               >
                 <option value="">— Optional: select a secondary supervisor —</option>
-                {SUPERVISORS.filter((s) => s !== supervisor1Name).map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
+                {supervisorOptions
+                  .filter((s) => s.uid !== supervisor1Uid)
+                  .map((s) => (
+                    <option key={s.uid} value={s.uid}>{s.name}</option>
+                  ))}
               </select>
               <p className={`text-xs mt-1.5 ${themeConfig.mutedText}`}>
                 Optional. If left blank, your primary supervisor may assign one later.
@@ -452,6 +486,27 @@ function Dashboard() {
           >
             Unable to meet deadline? Submit an extension reason →
           </button>
+        )}
+
+        {/* Submit for review */}
+        {isProfileSetup && approvalStage === 'pending' && (
+          <div className={`${themeConfig.cardBg} rounded-2xl border ${themeConfig.cardBorder} p-6`}>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className={`font-bold ${themeConfig.headingColor}`}>Ready for Review?</h3>
+                <p className={`text-sm mt-0.5 ${themeConfig.mutedText}`}>
+                  Submit your case to your primary supervisor when you are ready for feedback.
+                </p>
+              </div>
+              <button
+                onClick={handleSubmitForReview}
+                disabled={submitting}
+                className={`${themeConfig.button} disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-xl transition-colors shadow-sm text-sm whitespace-nowrap`}
+              >
+                {submitting ? 'Submitting...' : 'Submit for Review'}
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Save */}

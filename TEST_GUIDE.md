@@ -2,6 +2,15 @@
 
 ## Quick Test Setup
 
+### Invite Codes
+
+Check your `.env.local` for:
+
+```
+NEXT_PUBLIC_CODE_SUPERVISOR
+NEXT_PUBLIC_CODE_DRPAUL
+```
+
 ### Test Accounts to Create
 
 #### Supervisors (via `/supervisor-signup`)
@@ -10,22 +19,19 @@
    - Email: `supervisor1@test.edu`
    - Password: `Test1234!`
    - Name: `Dr. Davin Powdhar`
-   - Role: **Supervisor 1**
-   - Invite Code: (Check your `.env.local` for `NEXT_PUBLIC_CODE_SUPERVISOR1`)
+   - Invite Code: `NEXT_PUBLIC_CODE_SUPERVISOR`
 
 2. **Supervisor 2**
    - Email: `supervisor2@test.edu`
    - Password: `Test1234!`
    - Name: `Dr. Windale`
-   - Role: **Supervisor 2**
-   - Invite Code: (Check your `.env.local` for `NEXT_PUBLIC_CODE_SUPERVISOR2`)
+   - Invite Code: `NEXT_PUBLIC_CODE_SUPERVISOR`
 
 3. **Dr. Paul**
    - Email: `drpaul@test.edu`
    - Password: `Test1234!`
    - Name: `Dr. Paul`
-   - Role: **Dr. Paul (Lead Supervisor)**
-   - Invite Code: (Check your `.env.local` for `NEXT_PUBLIC_CODE_DRPAUL`)
+   - Invite Code: `NEXT_PUBLIC_CODE_DRPAUL`
 
 #### Students (via main signup `/`)
 
@@ -50,8 +56,9 @@
      - Start Year: `2024`
      - Class Year: `4`
      - Primary Supervisor: `Dr. Davin Powdhar`
+     - Secondary Supervisor: `Dr. Windale`
      - Mark sections: All 5/5 complete
-     - Save
+     - Save, then click **Submit for Review**
 
 3. **Student 3 - At Supervisor 2**
    - Email: `student3@test.edu`
@@ -62,8 +69,10 @@
      - Start Year: `2024`
      - Class Year: `3`
      - Primary Supervisor: `Dr. Davin Powdhar`
+     - Secondary Supervisor: `Dr. Windale`
      - Mark sections: All 5/5 complete
-     - Save
+     - Save, then click **Submit for Review**
+   - Sign in as **Dr. Davin Powdhar** and approve the case to move it to Supervisor 2
 
 4. **Student 4 - At Dr. Paul**
    - Email: `student4@test.edu`
@@ -74,71 +83,63 @@
      - Start Year: `2024`
      - Class Year: `3`
      - Primary Supervisor: `Dr. Davin Powdhar`
+     - Secondary Supervisor: `Dr. Windale`
      - Mark sections: All 5/5 complete
-     - Save
+     - Save, then click **Submit for Review**
+   - Sign in as **Dr. Davin Powdhar** and approve the case
+   - Sign in as **Dr. Windale** and approve the case
 
 ---
 
 ## Manual Case Status Setup
 
-Since the approval system is being implemented, you'll need to manually update Firestore to set different approval statuses for testing:
-
-### Firebase Console Steps:
+If you prefer to set up cases manually in Firestore instead of clicking through the UI:
 
 1. Go to [Firebase Console](https://console.firebase.google.com)
 2. Select your project
 3. Go to **Firestore Database**
 4. Navigate to **Collections → cases**
 
-#### Case 1: DMT-2024-001 (Pending - Student Not Submitted)
+### Case 1: DMT-2024-001 (Pending - Student Not Submitted)
 - **approvalStage**: `pending`
-- **submitted**: `false`
 - **sections**: All `false` or partial
 
-#### Case 2: DMT-2024-002 (Supervisor 1 Review)
+### Case 2: DMT-2024-002 (Supervisor 1 Review)
 - **approvalStage**: `supervisor1`
-- **submitted**: `true`
 - **sections**: All `true`
-- **supervisor1Approval**: 
+- **supervisor1Uid**: `<Dr. Davin's UID>`
+- **supervisor1Name**: `Dr. Davin Powdhar`
+- **supervisor1Approval**:
   ```
-  {
-    approved: false
-  }
+  { approved: false }
   ```
 
-#### Case 3: DMT-2024-003 (Supervisor 2 Review)
+### Case 3: DMT-2024-003 (Supervisor 2 Review)
 - **approvalStage**: `supervisor2`
-- **submitted**: `true`
 - **sections**: All `true`
+- **supervisor1Uid**: `<Dr. Davin's UID>`
 - **supervisor1Name**: `Dr. Davin Powdhar`
+- **supervisor2Uid**: `<Dr. Windale's UID>`
 - **supervisor2Name**: `Dr. Windale`
-- **supervisor1Approval**: 
+- **supervisor1Approval**:
   ```
-  {
-    approved: true,
-    approvedAt: <2 days ago>
-  }
+  { approved: true, approvedAt: <timestamp> }
   ```
 
-#### Case 4: DMT-2024-004 (Dr. Paul Review)
+### Case 4: DMT-2024-004 (Dr. Paul Review)
 - **approvalStage**: `drpaul`
-- **submitted**: `true`
 - **sections**: All `true`
+- **supervisor1Uid**: `<Dr. Davin's UID>`
 - **supervisor1Name**: `Dr. Davin Powdhar`
+- **supervisor2Uid**: `<Dr. Windale's UID>`
 - **supervisor2Name**: `Dr. Windale`
-- **supervisor1Approval**: 
+- **supervisor1Approval**:
   ```
-  {
-    approved: true,
-    approvedAt: <3 days ago>
-  }
+  { approved: true, approvedAt: <timestamp> }
   ```
-- **supervisor2Approval**: 
+- **supervisor2Approval**:
   ```
-  {
-    approved: true,
-    approvedAt: <1 day ago>
-  }
+  { approved: true, approvedAt: <timestamp> }
   ```
 
 ---
@@ -147,27 +148,27 @@ Since the approval system is being implemented, you'll need to manually update F
 
 ### After Creating Test Accounts:
 
-#### **Test as Supervisor 1**
+#### **Test as Supervisor 1 (Dr. Davin Powdhar)**
 
 1. Sign in to `/` with `supervisor1@test.edu` / `Test1234!`
 2. You'll be redirected to `/supervisor`
 3. You should see:
-   - ✅ Orange "Supervisor 1" banner with your responsibilities
+   - Generic Supervisor banner
    - 4 case records in the table
-   - **For DMT-2024-001**: Mark as "Pending" with "Awaiting Submission" status
-   - **For DMT-2024-002**: Show "🟠 Accept for Review" button (ready to approve)
+   - **For DMT-2024-001**: Mark as "Pending" with no action button
+   - **For DMT-2024-002**: Show approval button (ready to approve)
    - **For DMT-2024-003**: Show "Waiting for approval" (already approved by you)
    - **For DMT-2024-004**: Show "Waiting for approval" (already approved by you)
 
-#### **Test as Supervisor 2**
+#### **Test as Supervisor 2 (Dr. Windale)**
 
 1. Sign in with `supervisor2@test.edu` / `Test1234!`
 2. Go to `/supervisor`
 3. You should see:
-   - ✅ Amber "Supervisor 2" banner with your responsibilities
+   - Generic Supervisor banner
    - 4 case records
    - **For DMT-2024-001 & 002**: No action buttons (not at your stage yet)
-   - **For DMT-2024-003**: Show "🟡 Approve & Send to Dr. Paul" button
+   - **For DMT-2024-003**: Show approval button
    - **For DMT-2024-004**: Show "Waiting for approval" (already approved by you)
 
 #### **Test as Dr. Paul**
@@ -175,10 +176,10 @@ Since the approval system is being implemented, you'll need to manually update F
 1. Sign in with `drpaul@test.edu` / `Test1234!`
 2. Go to `/supervisor`
 3. You should see:
-   - ✅ Green "Dr. Paul" banner explaining final approval authority
+   - Dr. Paul banner
    - 4 case records
-   - **For DMT-2024-001, 002, 003**: No action buttons (Supervisor 2 hasn't approved yet)
-   - **For DMT-2024-004**: Show "✅ Grant Final Approval" button (ready for final approval)
+   - **For DMT-2024-001, 002, 003**: No action buttons (both supervisors haven't approved yet)
+   - **For DMT-2024-004**: Show "✅ Grant Final Approval" button
 
 ---
 
@@ -191,8 +192,8 @@ Since the approval system is being implemented, you'll need to manually update F
 - [x] UI shows role-appropriate buttons only
 
 ### ✅ Student Submission
-- [x] Students see only Supervisor 1 selection
-- [x] Cannot select Supervisor 2 directly
+- [x] Students select Supervisor 1 (required) and Supervisor 2 (optional)
+- [x] Students click "Submit for Review" to move case to Supervisor 1
 - [x] Progress pipeline shows current stage
 
 ### ✅ Visibility
@@ -202,7 +203,7 @@ Since the approval system is being implemented, you'll need to manually update F
 
 ### ✅ Approval Tracking
 - [x] Shows approval timestamps
-- [x] Shows who approved (supervisor name)
+- [x] Records per-supervisor approval objects
 - [x] Shows progression through stages
 
 ---
@@ -210,28 +211,11 @@ Since the approval system is being implemented, you'll need to manually update F
 ## Expected Visual Indicators
 
 ### Status Badges
-- 🔘 **Pending** (gray) - Awaiting submission & Supervisor 1 review
+- 🔘 **Pending** (gray) - Awaiting student submission
 - 🔘 **Supervisor 1** (orange) - Awaiting Supervisor 1 approval
 - 🔘 **Supervisor 2** (amber) - Supervisor 1 approved, awaiting Supervisor 2
 - 🔘 **Dr. Paul** (yellow) - Both supervisors approved, awaiting Dr. Paul
 - 🔘 **Approved** (green) - Final approval granted
-
-### Action Buttons (colored by role)
-- Supervisor 1: Orange buttons
-- Supervisor 2: Amber buttons  
-- Dr. Paul: Green buttons
-
----
-
-## Next Steps for Full Testing
-
-Once the approval action handlers are wired up:
-
-1. Click approval buttons and see cases advance
-2. Test rejection flow (send back to pending)
-3. Test approval rejection reasons
-4. Verify timestamps update correctly
-5. Test Dr. Paul revoke functionality
 
 ---
 
@@ -246,6 +230,6 @@ Once the approval action handlers are wired up:
 - Then manually create case records in Firestore with the student UIDs
 
 **Buttons not showing?**
-- Verify the approval status fields in Firestore are set correctly
-- Make sure case `approvalStage` matches the button logic
-
+- Check the `approvalStage` in Firestore matches the logic
+- Verify `supervisor1Approval.approved` is `true` for Supervisor 2 to see buttons
+- Check that `supervisor1Uid`/`supervisor2Uid` match the signed-in supervisor's UID

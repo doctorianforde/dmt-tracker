@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth-context';
 import AuthGuard from '@/components/AuthGuard';
 import Navbar from '@/components/Navbar';
 import CaseTable from '@/components/CaseTable';
-import { getAllCases, updateGreenLight, updateApprovalStage } from '@/lib/firestore';
+import { getAllCases, approveCase, revokeApproval } from '@/lib/firestore';
 import type { CaseRecord, ApprovalStage } from '@/types';
 
 const SUPERVISOR_ROLES = ['supervisor', 'drpaul'] as const;
@@ -22,14 +22,19 @@ function Dashboard() {
   const { userProfile } = useAuth();
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   const loadCases = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await getAllCases();
       setCases(data.sort((a, b) => a.studentName.localeCompare(b.studentName)));
       setLastRefresh(new Date());
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setLoadError('Failed to load cases: ' + msg);
     } finally {
       setLoading(false);
     }
@@ -37,19 +42,34 @@ function Dashboard() {
 
   useEffect(() => { loadCases(); }, [loadCases]);
 
-  const handleGreenLight = async (caseNumber: string, value: boolean) => {
-    await updateGreenLight(caseNumber, value);
+  const handleApprove = async (
+    caseNumber: string,
+    role: 'supervisor1' | 'supervisor2' | 'drpaul',
+    nextStage: ApprovalStage
+  ) => {
+    await approveCase(caseNumber, role, nextStage);
     setCases((prev) =>
-      prev.map((c) => (c.caseNumber === caseNumber ? { ...c, greenLight: value, approvalStage: value ? 'approved' : 'drpaul' } : c))
+      prev.map((c) =>
+        c.caseNumber === caseNumber
+          ? {
+              ...c,
+              approvalStage: nextStage,
+              greenLight: nextStage === 'approved',
+              [role === 'supervisor1'
+                ? 'supervisor1Approval'
+                : role === 'supervisor2'
+                ? 'supervisor2Approval'
+                : 'drpaulApproval']: { approved: true },
+            }
+          : c
+      )
     );
   };
 
-  const handleStageAdvance = async (caseNumber: string, stage: ApprovalStage) => {
-    await updateApprovalStage(caseNumber, stage);
+  const handleRevoke = async (caseNumber: string) => {
+    await revokeApproval(caseNumber);
     setCases((prev) =>
-      prev.map((c) => (c.caseNumber === caseNumber
-        ? { ...c, approvalStage: stage, greenLight: stage === 'approved' }
-        : c))
+      prev.map((c) => (c.caseNumber === caseNumber ? { ...c, greenLight: false, approvalStage: 'drpaul' } : c))
     );
   };
 
@@ -69,7 +89,7 @@ function Dashboard() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Supervisor Dashboard</h1>
             <p className="text-slate-500 text-sm mt-1">
-              {ROLE_TITLE[userProfile?.role ?? 'supervisor1']} · All student case records
+              {ROLE_TITLE[userProfile?.role ?? 'supervisor']} · All student case records
             </p>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
@@ -147,6 +167,18 @@ function Dashboard() {
           </div>
         </div>
 
+        {loadError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center">
+            <p className="text-sm font-semibold text-red-700">{loadError}</p>
+            <button
+              onClick={loadCases}
+              className="mt-3 px-4 py-2 bg-white border border-red-200 text-red-700 text-sm font-medium rounded-lg hover:bg-red-100"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="flex flex-col items-center gap-3">
@@ -160,8 +192,8 @@ function Dashboard() {
             isDrPaul={isDrPaul}
             isSupervisor={isSupervisor}
             supervisorName={userProfile?.name}
-            onGreenLight={handleGreenLight}
-            onStageAdvance={handleStageAdvance}
+            onApprove={handleApprove}
+            onRevoke={handleRevoke}
           />
         )}
       </main>

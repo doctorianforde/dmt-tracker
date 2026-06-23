@@ -5,22 +5,19 @@ import { useRouter } from 'next/navigation';
 
 const ROLE_LABELS: Record<string, string> = {
   student: 'Student',
-  supervisor1: 'Supervisor 1',
-  supervisor2: 'Supervisor 2',
+  supervisor: 'Supervisor',
   drpaul: 'Dr. Paul',
 };
 
 const ROLE_BADGE: Record<string, string> = {
   student: 'bg-sky-100 text-sky-800',
-  supervisor1: 'bg-violet-100 text-violet-800',
-  supervisor2: 'bg-indigo-100 text-indigo-800',
+  supervisor: 'bg-violet-100 text-violet-800',
   drpaul: 'bg-emerald-100 text-emerald-800',
 };
 
 const ROLE_BADGE_DARK: Record<string, string> = {
   student: 'bg-sky-900 text-sky-300',
-  supervisor1: 'bg-violet-900 text-violet-300',
-  supervisor2: 'bg-indigo-900 text-indigo-300',
+  supervisor: 'bg-violet-900 text-violet-300',
   drpaul: 'bg-emerald-900 text-emerald-300',
 };
 

@@ -6,9 +6,43 @@ import {
   collection,
   getDocs,
   serverTimestamp,
+  type DocumentData,
 } from 'firebase/firestore';
 import { getSafeDb } from './firebase';
-import type { UserProfile, CaseRecord } from '@/types';
+import type { UserProfile, CaseRecord, ApprovalStage, SupervisorApproval } from '@/types';
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function toDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (typeof (value as { toDate?: () => Date }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  if (value instanceof Date) return value;
+  return null;
+}
+
+function normalizeApproval(value: unknown): SupervisorApproval | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const a = value as DocumentData;
+  return {
+    approved: Boolean(a.approved),
+    approvedAt: toDate(a.approvedAt) ?? undefined,
+    rejectedAt: toDate(a.rejectedAt) ?? undefined,
+    rejectionReason: a.rejectionReason ?? undefined,
+    notes: a.notes ?? undefined,
+  };
+}
+
+function normalizeCaseRecord(data: DocumentData): CaseRecord {
+  return {
+    ...data,
+    updatedAt: toDate(data.updatedAt),
+    supervisor1Approval: normalizeApproval(data.supervisor1Approval),
+    supervisor2Approval: normalizeApproval(data.supervisor2Approval),
+    drpaulApproval: normalizeApproval(data.drpaulApproval),
+  } as CaseRecord;
+}
 
 // ── User Profiles ──────────────────────────────────────────────────────────
 
@@ -36,8 +70,7 @@ export async function getCaseRecord(caseNumber: string): Promise<CaseRecord | nu
   const db = getSafeDb();
   const snap = await getDoc(doc(db, 'cases', caseNumber));
   if (!snap.exists()) return null;
-  const data = snap.data();
-  return { ...data, updatedAt: typeof data.updatedAt?.toDate === 'function' ? data.updatedAt.toDate() : null } as CaseRecord;
+  return normalizeCaseRecord(snap.data());
 }
 
 export async function saveCaseRecord(
@@ -52,46 +85,32 @@ export async function saveCaseRecord(
   );
 }
 
-export async function updateGreenLight(caseNumber: string, value: boolean): Promise<void> {
-  const db = getSafeDb();
-  await updateDoc(doc(db, 'cases', caseNumber), {
-    greenLight: value,
-    updatedAt: serverTimestamp(),
-  });
-}
-
-export async function updateApprovalStage(
-  caseNumber: string,
-  stage: import('@/types').ApprovalStage
-): Promise<void> {
-  const db = getSafeDb();
-  await updateDoc(doc(db, 'cases', caseNumber), {
-    approvalStage: stage,
-    greenLight: stage === 'approved',
-    updatedAt: serverTimestamp(),
-  });
-}
-
-export async function approveBySupervisor(
+export async function approveCase(
   caseNumber: string,
   supervisorRole: 'supervisor1' | 'supervisor2' | 'drpaul',
-  nextStage?: import('@/types').ApprovalStage
+  nextStage: ApprovalStage
 ): Promise<void> {
   const db = getSafeDb();
   const approvalKey = `${supervisorRole}Approval` as const;
 
-  await updateDoc(doc(db, 'cases', caseNumber), {
+  const updates: Record<string, unknown> = {
     [approvalKey]: {
       approved: true,
       approvedAt: serverTimestamp(),
     },
-    ...(nextStage ? { approvalStage: nextStage } : {}),
-    greenLight: nextStage === 'approved',
+    approvalStage: nextStage,
     updatedAt: serverTimestamp(),
-  });
+  };
+
+  // Only Dr. Paul flips the final green light.
+  if (supervisorRole === 'drpaul') {
+    updates.greenLight = nextStage === 'approved';
+  }
+
+  await updateDoc(doc(db, 'cases', caseNumber), updates);
 }
 
-export async function rejectBySupervisor(
+export async function rejectCase(
   caseNumber: string,
   supervisorRole: 'supervisor1' | 'supervisor2' | 'drpaul',
   reason: string
@@ -110,11 +129,19 @@ export async function rejectBySupervisor(
   });
 }
 
+export async function revokeApproval(caseNumber: string): Promise<void> {
+  const db = getSafeDb();
+  await updateDoc(doc(db, 'cases', caseNumber), {
+    greenLight: false,
+    approvalStage: 'drpaul',
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function getAllCases(): Promise<CaseRecord[]> {
   const db = getSafeDb();
   const snap = await getDocs(collection(db, 'cases'));
-  return snap.docs.map((d) => {
-    const data = d.data();
-    return { ...data, updatedAt: typeof data.updatedAt?.toDate === 'function' ? data.updatedAt.toDate() : null } as CaseRecord;
-  });
+  return snap.docs
+    .map((d) => normalizeCaseRecord(d.data()))
+    .sort((a, b) => a.studentName.localeCompare(b.studentName));
 }

@@ -71,6 +71,7 @@ function Dashboard() {
 
   const [caseRecord, setCaseRecord] = useState<CaseRecord | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -91,22 +92,28 @@ function Dashboard() {
   useEffect(() => {
     async function load() {
       if (!user || !userProfile) return;
-      if (userProfile.theme) setTheme(userProfile.theme);
-      if (userProfile.caseNumber) {
-        setCaseNumber(userProfile.caseNumber);
-        setStartYear(userProfile.startYear ?? new Date().getFullYear());
-        setClassYear(userProfile.classYear ?? 1);
-        const rec = await getCaseRecord(userProfile.caseNumber);
-        if (rec) {
-          setCaseRecord(rec);
-          setSections(rec.sections ?? DEFAULT_SECTIONS);
-          setSupervisor1Name(rec.supervisor1Name ?? '');
-          setSupervisor2Name(rec.supervisor2Name ?? '');
-          setCustomDeadline(rec.customDeadline ?? '');
-          setExtensionReason(rec.extensionReason ?? '');
+      try {
+        if (userProfile.theme) setTheme(userProfile.theme);
+        if (userProfile.caseNumber) {
+          setCaseNumber(userProfile.caseNumber);
+          setStartYear(userProfile.startYear ?? new Date().getFullYear());
+          setClassYear(userProfile.classYear ?? 1);
+          const rec = await getCaseRecord(userProfile.caseNumber);
+          if (rec) {
+            setCaseRecord(rec);
+            setSections(rec.sections ?? DEFAULT_SECTIONS);
+            setSupervisor1Name(rec.supervisor1Name ?? '');
+            setSupervisor2Name(rec.supervisor2Name ?? '');
+            setCustomDeadline(rec.customDeadline ?? '');
+            setExtensionReason(rec.extensionReason ?? '');
+          }
         }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        setLoadError('Failed to load your case: ' + msg);
+      } finally {
+        setDataLoading(false);
       }
-      setDataLoading(false);
     }
     load();
   }, [user, userProfile]);
@@ -131,6 +138,7 @@ function Dashboard() {
         greenLight: caseRecord?.greenLight ?? false,
         approvalStage: caseRecord?.approvalStage ?? 'pending',
         ...(supervisor1Name ? { supervisor1Name } : {}),
+        ...(supervisor2Name ? { supervisor2Name } : {}),
         ...(customDeadline ? { customDeadline } : {}),
         ...(extensionReason.trim() ? { extensionReason: extensionReason.trim() } : {}),
       };
@@ -165,6 +173,23 @@ function Dashboard() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+        <div className="bg-white border border-red-200 rounded-2xl p-6 max-w-md text-center shadow-sm">
+          <p className="text-3xl mb-3">⚠️</p>
+          <p className="font-semibold text-red-700">{loadError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const completedCount = Object.values(sections).filter(Boolean).length;
   const completionPercent = Math.round((completedCount / 5) * 100);
   const firstName = userProfile?.name?.split(' ')[0] ?? 'Student';
@@ -174,7 +199,7 @@ function Dashboard() {
   // Check if deadline is within 30 days
   const deadlineDate = customDeadline ? new Date(customDeadline + 'T23:59:59') : new Date('2026-06-30T23:59:59');
   const daysLeft = Math.ceil((deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-  const deadlineUrgent = daysLeft <= 30 && daysLeft > 0;
+  const deadlineUrgent = daysLeft <= 30;
 
   // Input style helpers
   const inputClass = `w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-shadow
@@ -348,7 +373,23 @@ function Dashboard() {
                 ))}
               </select>
               <p className={`text-xs mt-1.5 ${themeConfig.mutedText}`}>
-                Submit your case to your primary supervisor. They will review and may assign a second supervisor if needed.
+                Submit your case to your primary supervisor.
+              </p>
+            </div>
+            <div className="sm:col-span-2">
+              <label className={labelClass}>Secondary Supervisor (Supervisor 2)</label>
+              <select
+                value={supervisor2Name}
+                onChange={(e) => setSupervisor2Name(e.target.value)}
+                className={`${inputClass} ${themeConfig.selectBg}`}
+              >
+                <option value="">— Optional: select a secondary supervisor —</option>
+                {SUPERVISORS.filter((s) => s !== supervisor1Name).map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <p className={`text-xs mt-1.5 ${themeConfig.mutedText}`}>
+                Optional. If left blank, your primary supervisor may assign one later.
               </p>
             </div>
           </div>
@@ -371,7 +412,7 @@ function Dashboard() {
         </div>
 
         {/* Accountability Section */}
-        {(deadlineUrgent || showExtension || extensionReason) && (
+        {(daysLeft <= 30 || showExtension || extensionReason) && (
           <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-6 space-y-4">
             <div className="flex items-start gap-3">
               <span className="text-2xl">⚠️</span>
@@ -404,7 +445,7 @@ function Dashboard() {
         )}
 
         {/* Show accountability toggle if not already urgent */}
-        {!deadlineUrgent && !showExtension && !extensionReason && (
+        {daysLeft > 30 && !showExtension && !extensionReason && (
           <button
             onClick={() => setShowExtension(true)}
             className={`text-xs ${themeConfig.mutedText} hover:underline`}

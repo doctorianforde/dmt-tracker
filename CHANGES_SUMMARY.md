@@ -101,10 +101,8 @@ The supervisor system has been simplified to allow **students to select their su
 
 ## Next Steps
 
-The UI is now set up for approval actions. To complete the flow:
-
-1. **Wire up approval buttons** - Call `approveBySupervisor()` function
-2. **Add rejection flow** - Call `rejectBySupervisor()` with feedback
+1. ~~**Wire up approval buttons**~~ ✅ Completed — approval actions now record per-supervisor approval objects with timestamps via `approveCase()`
+2. **Add rejection flow** - Add UI to call `rejectCase()` with feedback
 3. **Add notifications** - Email supervisors when cases arrive/advance
 4. **Create audit trail** - Log all approval actions
 5. **Supervisor management** - Admin panel to manage supervisor list

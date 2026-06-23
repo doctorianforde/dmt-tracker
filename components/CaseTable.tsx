@@ -8,8 +8,8 @@ interface Props {
   isDrPaul?: boolean;
   isSupervisor?: boolean;
   supervisorName?: string;
-  onGreenLight?: (caseNumber: string, value: boolean) => void;
-  onStageAdvance?: (caseNumber: string, stage: ApprovalStage) => void;
+  onApprove?: (caseNumber: string, role: 'supervisor1' | 'supervisor2' | 'drpaul', nextStage: ApprovalStage) => void;
+  onRevoke?: (caseNumber: string) => void;
 }
 
 const SECTION_KEYS = ['intro', 'caseReport', 'discussion', 'conclusion', 'references'] as const;
@@ -94,7 +94,7 @@ function getStageButtonLabel(next: ApprovalStage, supervisorName: string | undef
   return 'Advance';
 }
 
-export default function CaseTable({ cases, isDrPaul = false, isSupervisor = false, supervisorName, onGreenLight, onStageAdvance }: Props) {
+export default function CaseTable({ cases, isDrPaul = false, isSupervisor = false, supervisorName, onApprove, onRevoke }: Props) {
   const [search, setSearch] = useState('');
 
   const filtered = cases.filter(
@@ -143,19 +143,21 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
 
       {/* Search */}
       <div className="relative">
-        <svg
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
-          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+        <label htmlFor="case-search" className="sr-only">Search by name or case number</label>
         <input
+          id="case-search"
           type="text"
           placeholder="Search by name or case number..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
         />
+        <svg
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
       </div>
 
       {/* Table */}
@@ -242,7 +244,14 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
                           )}
                           {canApproveCase && nextStage && (
                             <button
-                              onClick={() => onStageAdvance?.(rec.caseNumber, nextStage)}
+                              onClick={() => {
+                                const role = isDrPaul
+                                  ? 'drpaul'
+                                  : rec.supervisor1Name === supervisorName
+                                  ? 'supervisor1'
+                                  : 'supervisor2';
+                                onApprove?.(rec.caseNumber, role, nextStage);
+                              }}
                               className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 whitespace-nowrap"
                             >
                               {getStageButtonLabel(nextStage, supervisorName, rec)}
@@ -253,7 +262,7 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
                           )}
                           {isDrPaul && stage === 'approved' && (
                             <button
-                              onClick={() => onGreenLight?.(rec.caseNumber, false)}
+                              onClick={() => onRevoke?.(rec.caseNumber)}
                               className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
                             >
                               Revoke

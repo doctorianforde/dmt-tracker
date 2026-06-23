@@ -11,23 +11,27 @@ service cloud.firestore {
     }
 
     function isSupervisor() {
-      return isAuthed() && userDoc().role in ['supervisor1', 'supervisor2', 'drpaul'];
-    }
-
-    function isStudent() {
-      return isAuthed() && userDoc().role == 'student';
+      return isAuthed() && userDoc().role == 'supervisor';
     }
 
     function isDrPaul() {
       return isAuthed() && userDoc().role == 'drpaul';
     }
 
+    function isStaff() {
+      return isAuthed() && userDoc().role in ['supervisor', 'drpaul'];
+    }
+
+    function isStudent() {
+      return isAuthed() && userDoc().role == 'student';
+    }
+
     // ── Users ────────────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if request.auth.uid == userId || isSupervisor();
+      allow read: if request.auth.uid == userId || isStaff();
 
       allow create: if request.auth.uid == userId
-        && request.resource.data.role in ['student', 'supervisor1', 'supervisor2', 'drpaul'];
+        && request.resource.data.role in ['student', 'supervisor', 'drpaul'];
 
       // Users can update their own profile but cannot change their role
       allow update: if request.auth.uid == userId
@@ -36,8 +40,8 @@ service cloud.firestore {
 
     // ── Cases ────────────────────────────────────────────────────────────────
     match /cases/{caseNumber} {
-      // Students read their own case (matched via studentUid); supervisors read all
-      allow read: if isSupervisor()
+      // Students read their own case (matched via studentUid); staff read all
+      allow read: if isStaff()
         || (isStudent() && resource.data.studentUid == request.auth.uid);
 
       // Students create a case — ownership proven by studentUid in the new document
@@ -45,16 +49,27 @@ service cloud.firestore {
         && request.resource.data.studentUid == request.auth.uid
         && request.resource.data.greenLight == false;
 
-      // Students update their own case but cannot touch greenLight
+      // Privileged fields that students can never modify
+      function protectedCaseFields() {
+        return ['greenLight', 'approvalStage', 'submitted',
+                'supervisor1Approval', 'supervisor2Approval', 'drpaulApproval'];
+      }
+
       allow update: if
+        // Students can update their own case content but cannot touch approval state
         (isStudent()
           && resource.data.studentUid == request.auth.uid
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['greenLight']))
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedCaseFields()))
         ||
-        // Dr. Paul can only flip greenLight (and updatedAt timestamp)
+        // Supervisors can record their own approval and advance the stage
+        (isSupervisor()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['approvalStage', 'supervisor1Approval', 'supervisor2Approval', 'updatedAt']))
+        ||
+        // Dr. Paul can give/revoke final green light and record final approval
         (isDrPaul()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['greenLight', 'updatedAt']));
+               .hasOnly(['greenLight', 'approvalStage', 'drpaulApproval', 'updatedAt']));
     }
   }
 }

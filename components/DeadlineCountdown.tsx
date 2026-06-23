@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 
 const DEFAULT_DEADLINE = new Date('2026-06-30T23:59:59');
@@ -10,16 +10,26 @@ interface Props {
   completionPercent?: number; // 0–100 (for tracking progress)
 }
 
+function getDaysUntilDeadline(customDeadline: string | undefined, now: number) {
+  const deadline = customDeadline ? new Date(customDeadline + 'T23:59:59') : DEFAULT_DEADLINE;
+  const diff = deadline.getTime() - now;
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  let urgency: 'critical' | 'warning' | 'ok' = 'ok';
+  if (days <= 14) urgency = 'critical';
+  else if (days <= 60) urgency = 'warning';
+  return { days, urgency, deadline };
+}
+
 export default function DeadlineCountdown({ customDeadline, completionPercent = 0 }: Props) {
   const { activeQuote } = useTheme();
-  const { days, urgency, deadline } = useMemo(() => {
-    const deadline = customDeadline ? new Date(customDeadline + 'T23:59:59') : DEFAULT_DEADLINE;
-    const diff = deadline.getTime() - Date.now();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    if (days <= 14) return { days, urgency: 'critical' as const, deadline };
-    if (days <= 60) return { days, urgency: 'warning' as const, deadline };
-    return { days, urgency: 'ok' as const, deadline };
-  }, [customDeadline]);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000 * 60 * 60); // update every hour
+    return () => clearInterval(interval);
+  }, []);
+
+  const { days, urgency, deadline } = getDaysUntilDeadline(customDeadline, now);
 
   const styles = {
     critical: 'bg-red-50 border-red-200 text-red-900',

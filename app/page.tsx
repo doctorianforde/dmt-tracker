@@ -103,11 +103,11 @@ export default function LoginPage() {
           {/* Motivational Quote Banner */}
           <div className="mb-8 p-6 rounded-xl shadow-lg backdrop-blur-sm border border-sky-200 bg-gradient-to-br from-sky-50 to-blue-50 transition-all duration-300 hover:shadow-xl hover:scale-[1.02]">
             <div className="flex flex-col items-center gap-3">
-              <span className="text-4xl opacity-40">"</span>
+              <span className="text-4xl opacity-40">&ldquo;</span>
               <p className="text-center text-sm md:text-base italic font-medium leading-relaxed text-slate-800">
                 {activeQuote}
               </p>
-              <span className="text-4xl opacity-40">"</span>
+              <span className="text-4xl opacity-40">&rdquo;</span>
             </div>
           </div>
 

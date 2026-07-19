@@ -13,7 +13,7 @@ import {
   submitCaseForReview,
   updateUserProfile,
 } from '@/lib/firestore';
-import type { CaseRecord, CaseSections, ApprovalStage, ThemeChoice, UserProfile } from '@/types';
+import type { CaseRecord, CaseSections, ApprovalStage, ThemeChoice, UserProfile, UserRole } from '@/types';
 import { THEMES, THEME_ORDER } from '@/lib/themes';
 import { DEFAULT_DEADLINE, START_YEAR_MIN, START_YEAR_MAX, CLASS_YEARS, SUPERVISORS } from '@/lib/config';
 
@@ -42,9 +42,12 @@ const PIPELINE_STEPS: { stage: ApprovalStage; label: string; color: string }[] =
 
 export { SUPERVISORS };
 
+// Defined once at module scope — see the same note in SupervisorDashboard.tsx.
+const STUDENT_ROLES: UserRole[] = ['student'];
+
 export default function StudentDashboard() {
   return (
-    <AuthGuard allowedRoles={['student']}>
+    <AuthGuard allowedRoles={STUDENT_ROLES}>
       <Dashboard />
     </AuthGuard>
   );

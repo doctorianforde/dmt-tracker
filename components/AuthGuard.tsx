@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import type { UserRole } from '@/types';
 
@@ -10,21 +10,37 @@ interface AuthGuardProps {
   allowedRoles: UserRole[];
 }
 
+// Where each role lands when it hits a route it's not allowed on. A role
+// value outside this map (e.g. stale data from before a role migration)
+// has no safe home to redirect to, so it's handled separately below.
+const ROLE_HOME: Record<UserRole, string> = {
+  student: '/student',
+  supervisor: '/supervisor',
+  drpaul: '/supervisor',
+};
+
 export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
-  const { user, userProfile, loading } = useAuth();
+  const { user, userProfile, loading, signOut } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      router.push('/');
+      if (pathname !== '/') router.push('/');
       return;
     }
-    if (userProfile && !allowedRoles.includes(userProfile.role)) {
-      if (userProfile.role === 'student') router.push('/student');
-      else router.push('/supervisor');
+    if (!userProfile || allowedRoles.includes(userProfile.role)) return;
+
+    const home = ROLE_HOME[userProfile.role];
+    if (!home) {
+      // Unrecognized role — there's no route to send them to, so sign out
+      // rather than guess and risk redirecting back to this same page.
+      signOut();
+      return;
     }
-  }, [user, userProfile, loading, router, allowedRoles]);
+    if (home !== pathname) router.push(home);
+  }, [user, userProfile, loading, router, pathname, allowedRoles, signOut]);
 
   if (loading) {
     return (

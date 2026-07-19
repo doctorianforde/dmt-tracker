@@ -6,13 +6,16 @@ import AuthGuard from '@/components/AuthGuard';
 import Navbar from '@/components/Navbar';
 import CaseTable from '@/components/CaseTable';
 import { getAllCases, approveCase, rejectCase, revokeApproval } from '@/lib/firestore';
-import type { CaseRecord, ApprovalStage } from '@/types';
+import type { CaseRecord, ApprovalStage, UserRole } from '@/types';
 
-const SUPERVISOR_ROLES = ['supervisor', 'drpaul'] as const;
+// Defined once at module scope — AuthGuard's redirect effect depends on this
+// array by reference, so recreating it on every render would retrigger the
+// effect continuously.
+const SUPERVISOR_ROLES: UserRole[] = ['supervisor', 'drpaul'];
 
 export default function SupervisorDashboard() {
   return (
-    <AuthGuard allowedRoles={[...SUPERVISOR_ROLES]}>
+    <AuthGuard allowedRoles={SUPERVISOR_ROLES}>
       <Dashboard />
     </AuthGuard>
   );

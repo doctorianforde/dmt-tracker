@@ -247,7 +247,7 @@ function Dashboard() {
   const labelClass = `block text-xs font-semibold uppercase tracking-wide mb-1.5 ${themeConfig.labelColor}`;
 
   return (
-    <div className={`min-h-screen relative ${themeConfig.pageBg}`}>
+    <div className={`min-h-screen relative isolate ${themeConfig.pageBg}`}>
       <div
         className="fixed inset-0 -z-10 bg-cover bg-center"
         style={{ backgroundImage: `url(${themeConfig.bgImage})` }}

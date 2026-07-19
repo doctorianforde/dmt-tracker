@@ -10,7 +10,7 @@ import {
 } from 'firebase/auth';
 import { auth } from './firebase';
 import { getUserProfile, createUserProfile } from './firestore';
-import type { UserProfile, UserRole } from '@/types';
+import type { UserProfile } from '@/types';
 
 interface AuthContextType {
   user: User | null;
@@ -18,7 +18,6 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
-  signUpWithRole: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -76,14 +75,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserProfile(newProfile);
   };
 
-  const signUpWithRole = async (email: string, password: string, name: string, role: UserRole) => {
-    if (!auth) throw new Error('Firebase is not configured');
-    const result = await createUserWithEmailAndPassword(auth, email, password);
-    const newProfile: UserProfile = { uid: result.user.uid, name, email, role };
-    await createUserProfile(newProfile);
-    setUserProfile(newProfile);
-  };
-
   const signOut = async () => {
     if (!auth) return;
     await firebaseSignOut(auth);
@@ -92,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, signIn, signUp, signUpWithRole, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, userProfile, loading, signIn, signUp, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

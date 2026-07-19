@@ -23,12 +23,26 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
 NEXT_PUBLIC_FIREBASE_APP_ID=...
 ```
 
-3. Add invite codes for supervisor sign-up:
+3. Add the invite codes (server-only — never shipped to the browser). Keep
+   them different from each other — whichever one is submitted determines the
+   account's role:
 
 ```
-NEXT_PUBLIC_CODE_SUPERVISOR=your-supervisor-invite-code
-NEXT_PUBLIC_CODE_DRPAUL=your-drpaul-invite-code
+SUPERVISOR_INVITE_CODE=your-supervisor-invite-code
+DRPAUL_INVITE_CODE=your-drpaul-invite-code
 ```
+
+4. Generate a service-account key for the Admin SDK: Project Settings → Service
+   Accounts → Generate new private key. Add its values to `.env.local`:
+
+```
+FIREBASE_ADMIN_PROJECT_ID=your_project_id
+FIREBASE_ADMIN_CLIENT_EMAIL=your_service_account@your_project.iam.gserviceaccount.com
+FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+This credential is privileged — it bypasses `firestore.rules` entirely. Never
+commit it or expose it as a `NEXT_PUBLIC_*` variable.
 
 ## 3. Firestore Security Rules
 
@@ -50,15 +64,32 @@ service firebase.storage {
 }
 ```
 
-## 5. Create Supervisor Accounts
+## 5. Create Supervisor / Dr. Paul Accounts
 
-Supervisor accounts must be created via `/supervisor-signup` (students self-register on `/`):
+Students self-register on `/`. Staff accounts (supervisor and Dr. Paul) work
+differently, since they need to be gated by an invite code without exposing
+that code to the browser — `/supervisor-signup` posts to a server-side API
+route (`/api/supervisor-signup`) that checks the submitted code against both
+`SUPERVISOR_INVITE_CODE` and `DRPAUL_INVITE_CODE` and creates the account
+with the Firebase Admin SDK. The role is whichever code matched — the client
+never sends a role directly, so there's nothing to spoof by editing the form:
 
 1. Go to `http://localhost:3000/supervisor-signup`
-2. Fill in the supervisor's name, email, password, and the `NEXT_PUBLIC_CODE_SUPERVISOR` invite code
-3. Repeat for Dr. Paul using the `NEXT_PUBLIC_CODE_DRPAUL` code
+2. Fill in the name, email, password, and invite code
+3. Entering `SUPERVISOR_INVITE_CODE` creates a `supervisor`; entering
+   `DRPAUL_INVITE_CODE` creates `drpaul`
 
-Valid roles in Firestore are: `student`, `supervisor`, `drpaul`.
+`scripts/create-supervisor.mjs` still works as a fallback for one-off admin
+provisioning directly via the Admin SDK, bypassing invite codes entirely:
+
+```bash
+# Edit the ACCOUNT object in scripts/create-supervisor.mjs first
+node --env-file=.env.local scripts/create-supervisor.mjs
+```
+
+Valid roles in Firestore are: `student`, `supervisor`, `drpaul`. `firestore.rules`
+only lets a client create their own profile with `role: 'student'` — anything
+else has to go through the Admin SDK, which bypasses the rules by design.
 
 ## 6. Local Development
 
@@ -83,7 +114,11 @@ npm run test     # Vitest
 
 1. Push this folder to a GitHub repository
 2. Go to [vercel.com](https://vercel.com) → New Project → Import from GitHub
-3. Add all `NEXT_PUBLIC_FIREBASE_*` environment variables in Vercel project settings
+3. Add all `NEXT_PUBLIC_FIREBASE_*` variables, `SUPERVISOR_INVITE_CODE`,
+   `DRPAUL_INVITE_CODE`, and the three `FIREBASE_ADMIN_*` variables, in Vercel
+   project settings. Paste `FIREBASE_ADMIN_PRIVATE_KEY` exactly as it appears
+   in the downloaded JSON (Vercel's env var editor handles the embedded
+   newlines fine).
 4. Deploy — Vercel detects Next.js automatically
 
 ## User Flows
@@ -91,5 +126,5 @@ npm run test     # Vitest
 | Role | Login | Can Do |
 |------|-------|--------|
 | Student | Self-register on `/` | View/edit own profile and case, select supervisors, submit for review |
-| Supervisor | Sign up via `/supervisor-signup` | View all cases, approve cases assigned by students |
-| Dr. Paul | Sign up via `/supervisor-signup` | View all cases, grant/revoke final approval |
+| Supervisor | Sign up via `/supervisor-signup` with `SUPERVISOR_INVITE_CODE` | View all cases, approve cases assigned by students |
+| Dr. Paul | Sign up via `/supervisor-signup` with `DRPAUL_INVITE_CODE` | View all cases, grant/revoke final approval |

@@ -32,8 +32,11 @@ service cloud.firestore {
       // In a stricter deployment, expose supervisors through a dedicated public collection.
       allow read: if isAuthed();
 
+      // Clients may only self-register as a student. Supervisor and Dr. Paul
+      // accounts are created server-side (via the Admin SDK, which bypasses
+      // these rules) after verifying an invite code — see /api/supervisor-signup.
       allow create: if request.auth.uid == userId
-        && request.resource.data.role in ['student', 'supervisor', 'drpaul'];
+        && request.resource.data.role == 'student';
 
       // Users can update their own profile but cannot change their role
       allow update: if request.auth.uid == userId
@@ -57,12 +60,13 @@ service cloud.firestore {
       }
 
       function studentCanUpdateCase() {
-        const affected = request.resource.data.diff(resource.data).affectedKeys();
-        if (affected.hasAny(protectedCaseFields())) return false;
-        if (!affected.hasAny(['approvalStage'])) return true;
-        // Students may submit their case (pending -> supervisor1) but cannot change other stages.
-        return resource.data.approvalStage == 'pending'
-          && request.resource.data.approvalStage == 'supervisor1';
+        let affected = request.resource.data.diff(resource.data).affectedKeys();
+        // Students may submit their case (pending -> supervisor1) but cannot change other stages,
+        // and can never touch the protected fields above.
+        return !affected.hasAny(protectedCaseFields())
+          && (!affected.hasAny(['approvalStage'])
+              || (resource.data.approvalStage == 'pending'
+                  && request.resource.data.approvalStage == 'supervisor1'));
       }
 
       allow update: if

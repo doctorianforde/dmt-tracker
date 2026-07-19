@@ -33,13 +33,13 @@ const testSupervisors = [
     email: 'supervisor1@test.edu',
     password: 'Test1234!',
     name: 'Dr. Davin Powdhar',
-    role: 'supervisor1',
+    role: 'supervisor',
   },
   {
     email: 'supervisor2@test.edu',
     password: 'Test1234!',
     name: 'Dr. Windale',
-    role: 'supervisor2',
+    role: 'supervisor',
   },
   {
     email: 'drpaul@test.edu',

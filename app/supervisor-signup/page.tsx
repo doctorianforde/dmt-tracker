@@ -4,9 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import type { UserRole } from '@/types';
-
-const SUPERVISOR_CODE = process.env.NEXT_PUBLIC_CODE_SUPERVISOR;
 
 export default function SupervisorSignupPage() {
   const [name, setName] = useState('');
@@ -16,7 +13,7 @@ export default function SupervisorSignupPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { user, userProfile, signUpWithRole } = useAuth();
+  const { user, userProfile, signIn } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -30,14 +27,6 @@ export default function SupervisorSignupPage() {
     e.preventDefault();
     setError('');
 
-    if (!SUPERVISOR_CODE) {
-      setError('Invite codes are not configured. Contact the administrator.');
-      return;
-    }
-    if (code.trim() !== SUPERVISOR_CODE.trim()) {
-      setError('Incorrect invite code. Please check with your administrator.');
-      return;
-    }
     if (!name.trim()) {
       setError('Please enter your full name.');
       return;
@@ -45,16 +34,20 @@ export default function SupervisorSignupPage() {
 
     setSubmitting(true);
     try {
-      await signUpWithRole(email, password, name.trim(), 'supervisor');
+      const res = await fetch('/api/supervisor-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), email, password, code: code.trim() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(data.error ?? 'Sign-up failed');
+        return;
+      }
+      await signIn(email, password);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Sign-up failed';
-      if (msg.includes('email-already-in-use')) {
-        setError('An account with this email already exists. Try signing in.');
-      } else if (msg.includes('weak-password')) {
-        setError('Password must be at least 6 characters.');
-      } else {
-        setError(msg);
-      }
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -74,15 +67,15 @@ export default function SupervisorSignupPage() {
           </div>
 
           <h2 className="text-4xl font-bold text-white leading-tight mb-5">
-            Supervisor &amp;
+            Staff
             <br />
-            Lecturer
+            Account
             <br />
-            <span className="text-violet-300">Account Setup</span>
+            <span className="text-violet-300">Setup</span>
           </h2>
           <p className="text-violet-200 text-base leading-relaxed max-w-sm">
-            Register your supervisor account using the invite code provided by your administrator.
-            You will have access to all student case records.
+            Register your account using the invite code provided by your administrator.
+            Your role — supervisor or Dr. Paul — is set automatically based on which code you enter.
           </p>
         </div>
 
@@ -116,19 +109,13 @@ export default function SupervisorSignupPage() {
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
             <div className="mb-7">
-              <h1 className="text-2xl font-bold text-slate-900">Supervisor sign up</h1>
+              <h1 className="text-2xl font-bold text-slate-900">Staff sign up</h1>
               <p className="text-slate-500 text-sm mt-1">
                 You need an invite code for your role
               </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Role info badge */}
-              <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-xl px-3 py-2">
-                <span className="text-violet-600">👥</span>
-                <span className="text-xs text-violet-700 font-medium">Signing up as Supervisor</span>
-              </div>
-
               {/* Name */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
@@ -184,7 +171,7 @@ export default function SupervisorSignupPage() {
                   type="text"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  placeholder="Enter your supervisor invite code"
+                  placeholder="Enter your invite code"
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent font-mono tracking-widest"
                   required
                 />
@@ -205,7 +192,7 @@ export default function SupervisorSignupPage() {
                 disabled={submitting}
                 className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors text-sm shadow-sm"
               >
-                {submitting ? 'Creating account...' : 'Create Supervisor Account'}
+                {submitting ? 'Creating account...' : 'Create Account'}
               </button>
             </form>
 

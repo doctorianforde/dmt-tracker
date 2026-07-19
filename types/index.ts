@@ -15,6 +15,8 @@ export interface ThemeConfig {
   name: string;
   emoji: string;
   navVariant: 'light' | 'dark';
+  bgImage: string;
+  bgOverlay: string;
   pageBg: string;
   cardBg: string;
   cardBorder: string;

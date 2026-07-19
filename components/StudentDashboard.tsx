@@ -247,7 +247,12 @@ function Dashboard() {
   const labelClass = `block text-xs font-semibold uppercase tracking-wide mb-1.5 ${themeConfig.labelColor}`;
 
   return (
-    <div className={`min-h-screen ${themeConfig.pageBg}`}>
+    <div className={`min-h-screen relative ${themeConfig.pageBg}`}>
+      <div
+        className="fixed inset-0 -z-10 bg-cover bg-center"
+        style={{ backgroundImage: `url(${themeConfig.bgImage})` }}
+      />
+      <div className={`fixed inset-0 -z-10 ${themeConfig.bgOverlay}`} />
       <Navbar variant={themeConfig.navVariant} />
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
 

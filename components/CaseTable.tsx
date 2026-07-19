@@ -10,7 +10,25 @@ interface Props {
   supervisorUid?: string;
   supervisorName?: string;
   onApprove?: (caseNumber: string, role: 'supervisor1' | 'supervisor2' | 'drpaul', nextStage: ApprovalStage) => void;
+  onReject?: (caseNumber: string, role: 'supervisor1' | 'supervisor2' | 'drpaul', reason: string) => void;
   onRevoke?: (caseNumber: string) => void;
+}
+
+function reviewerRole(
+  record: CaseRecord,
+  isDrPaul: boolean,
+  supervisorUid: string | undefined,
+  supervisorName: string | undefined
+): 'supervisor1' | 'supervisor2' | 'drpaul' {
+  if (isDrPaul) return 'drpaul';
+  return isAssignedSupervisor1(record, supervisorUid, supervisorName) ? 'supervisor1' : 'supervisor2';
+}
+
+function currentStageApproval(record: CaseRecord, stage: ApprovalStage) {
+  if (stage === 'supervisor1') return record.supervisor1Approval;
+  if (stage === 'supervisor2') return record.supervisor2Approval;
+  if (stage === 'drpaul') return record.drpaulApproval;
+  return undefined;
 }
 
 // Backward-compatible matching: prefer UID, fall back to display name for legacy cases.
@@ -22,6 +40,12 @@ function isAssignedSupervisor1(record: CaseRecord, supervisorUid?: string, super
 function isAssignedSupervisor2(record: CaseRecord, supervisorUid?: string, supervisorName?: string) {
   if (supervisorUid && record.supervisor2Uid) return record.supervisor2Uid === supervisorUid;
   return !!supervisorName && record.supervisor2Name === supervisorName;
+}
+
+// A case with no Supervisor 2 assigned doesn't need a Supervisor 2 approval to proceed.
+function supervisor2Satisfied(record: CaseRecord): boolean {
+  if (!record.supervisor2Uid && !record.supervisor2Name) return true;
+  return !!record.supervisor2Approval?.approved;
 }
 
 const SECTION_KEYS = ['intro', 'caseReport', 'discussion', 'conclusion', 'references'] as const;
@@ -61,7 +85,7 @@ function getNextStage(
     }
   }
 
-  if (isDrPaul && current === 'drpaul' && record.supervisor1Approval?.approved && record.supervisor2Approval?.approved) {
+  if (isDrPaul && current === 'drpaul' && record.supervisor1Approval?.approved && supervisor2Satisfied(record)) {
     return 'approved';
   }
 
@@ -84,7 +108,7 @@ function canApprove(
     if (sup2 && stage === 'supervisor2' && !record.supervisor2Approval?.approved && record.supervisor1Approval?.approved) return true;
   }
 
-  if (isDrPaul && stage === 'drpaul' && !record.drpaulApproval?.approved && record.supervisor1Approval?.approved && record.supervisor2Approval?.approved) {
+  if (isDrPaul && stage === 'drpaul' && !record.drpaulApproval?.approved && record.supervisor1Approval?.approved && supervisor2Satisfied(record)) {
     return true;
   }
 
@@ -107,8 +131,27 @@ function getStageButtonLabel(next: ApprovalStage, supervisorUid: string | undefi
   return 'Advance';
 }
 
-export default function CaseTable({ cases, isDrPaul = false, isSupervisor = false, supervisorUid, supervisorName, onApprove, onRevoke }: Props) {
+export default function CaseTable({ cases, isDrPaul = false, isSupervisor = false, supervisorUid, supervisorName, onApprove, onReject, onRevoke }: Props) {
   const [search, setSearch] = useState('');
+  const [rejectingCase, setRejectingCase] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+
+  const startReject = (caseNumber: string) => {
+    setRejectingCase(caseNumber);
+    setRejectReason('');
+  };
+
+  const cancelReject = () => {
+    setRejectingCase(null);
+    setRejectReason('');
+  };
+
+  const confirmReject = (record: CaseRecord) => {
+    if (!rejectReason.trim()) return;
+    const role = reviewerRole(record, isDrPaul, supervisorUid, supervisorName);
+    onReject?.(record.caseNumber, role, rejectReason.trim());
+    cancelReject();
+  };
 
   const filtered = cases.filter(
     (c) =>
@@ -250,23 +293,62 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
                           {stage === 'drpaul' && rec.drpaulApproval?.approved && (
                             <span className="text-xs text-emerald-600 font-semibold">✅ Approved by Dr. Paul</span>
                           )}
-                          {canApproveCase && nextStage && (
-                            <button
-                              onClick={() => {
-                                const role = isDrPaul
-                                  ? 'drpaul'
-                                  : isAssignedSupervisor1(rec, supervisorUid, supervisorName)
-                                  ? 'supervisor1'
-                                  : 'supervisor2';
-                                onApprove?.(rec.caseNumber, role, nextStage);
-                              }}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 whitespace-nowrap"
-                            >
-                              {getStageButtonLabel(nextStage, supervisorUid, supervisorName, rec)}
-                            </button>
+                          {canApproveCase && nextStage && rejectingCase !== rec.caseNumber && (
+                            <div className="flex flex-col items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  const role = reviewerRole(rec, isDrPaul, supervisorUid, supervisorName);
+                                  onApprove?.(rec.caseNumber, role, nextStage);
+                                }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 whitespace-nowrap"
+                              >
+                                {getStageButtonLabel(nextStage, supervisorUid, supervisorName, rec)}
+                              </button>
+                              <button
+                                onClick={() => startReject(rec.caseNumber)}
+                                className="px-3 py-1 rounded-lg text-xs font-medium transition-colors text-red-600 hover:bg-red-50 whitespace-nowrap"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                          {canApproveCase && rejectingCase === rec.caseNumber && (
+                            <div className="flex flex-col items-stretch gap-1.5 w-48">
+                              <textarea
+                                autoFocus
+                                value={rejectReason}
+                                onChange={(e) => setRejectReason(e.target.value)}
+                                placeholder="Reason for rejection..."
+                                rows={2}
+                                className="w-full px-2 py-1.5 border border-red-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-red-300 resize-none"
+                              />
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => confirmReject(rec)}
+                                  disabled={!rejectReason.trim()}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={cancelReject}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
                           )}
                           {!canApproveCase && stage !== 'pending' && stage !== 'approved' && (
                             <span className="text-xs text-slate-400">Waiting for approval</span>
+                          )}
+                          {currentStageApproval(rec, stage)?.rejectionReason && (
+                            <span
+                              className="text-xs text-red-500 max-w-[10rem] truncate"
+                              title={currentStageApproval(rec, stage)?.rejectionReason}
+                            >
+                              ❌ Rejected: {currentStageApproval(rec, stage)?.rejectionReason}
+                            </span>
                           )}
                           {isDrPaul && stage === 'approved' && (
                             <button

@@ -127,6 +127,10 @@ export async function approveCase(
   await updateDoc(doc(db, 'cases', caseNumber), updates);
 }
 
+// Rejection intentionally leaves approvalStage untouched: the case stays at the
+// rejecting reviewer's stage (with approved: false) so they can re-approve directly
+// once the student addresses the feedback, instead of requiring a full resubmission
+// that would re-route past reviewers whose approvals are still recorded as true.
 export async function rejectCase(
   caseNumber: string,
   supervisorRole: 'supervisor1' | 'supervisor2' | 'drpaul',
@@ -141,7 +145,6 @@ export async function rejectCase(
       rejectedAt: serverTimestamp(),
       rejectionReason: reason,
     },
-    approvalStage: 'pending',
     updatedAt: serverTimestamp(),
   });
 }

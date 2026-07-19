@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth-context';
 import AuthGuard from '@/components/AuthGuard';
 import Navbar from '@/components/Navbar';
 import CaseTable from '@/components/CaseTable';
-import { getAllCases, approveCase, revokeApproval } from '@/lib/firestore';
+import { getAllCases, approveCase, rejectCase, revokeApproval } from '@/lib/firestore';
 import type { CaseRecord, ApprovalStage } from '@/types';
 
 const SUPERVISOR_ROLES = ['supervisor', 'drpaul'] as const;
@@ -60,6 +60,28 @@ function Dashboard() {
                 : role === 'supervisor2'
                 ? 'supervisor2Approval'
                 : 'drpaulApproval']: { approved: true },
+            }
+          : c
+      )
+    );
+  };
+
+  const handleReject = async (
+    caseNumber: string,
+    role: 'supervisor1' | 'supervisor2' | 'drpaul',
+    reason: string
+  ) => {
+    await rejectCase(caseNumber, role, reason);
+    setCases((prev) =>
+      prev.map((c) =>
+        c.caseNumber === caseNumber
+          ? {
+              ...c,
+              [role === 'supervisor1'
+                ? 'supervisor1Approval'
+                : role === 'supervisor2'
+                ? 'supervisor2Approval'
+                : 'drpaulApproval']: { approved: false, rejectionReason: reason },
             }
           : c
       )
@@ -194,6 +216,7 @@ function Dashboard() {
             supervisorUid={userProfile?.uid}
             supervisorName={userProfile?.name}
             onApprove={handleApprove}
+            onReject={handleReject}
             onRevoke={handleRevoke}
           />
         )}

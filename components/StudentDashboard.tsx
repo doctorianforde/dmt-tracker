@@ -228,6 +228,13 @@ function Dashboard() {
   const approvalStage: ApprovalStage = caseRecord?.approvalStage ?? (caseRecord?.greenLight ? 'approved' : 'pending');
   const stageInfo = STAGE_CONFIG[approvalStage];
 
+  const currentStageApproval =
+    approvalStage === 'supervisor1' ? caseRecord?.supervisor1Approval
+    : approvalStage === 'supervisor2' ? caseRecord?.supervisor2Approval
+    : approvalStage === 'drpaul' ? caseRecord?.drpaulApproval
+    : undefined;
+  const rejectionReason = !currentStageApproval?.approved ? currentStageApproval?.rejectionReason : undefined;
+
   // Check if deadline is within 30 days
   const deadlineDate = customDeadline ? new Date(customDeadline + 'T23:59:59') : new Date(`${DEFAULT_DEADLINE}T23:59:59`);
   const daysLeft = Math.ceil((deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -317,6 +324,22 @@ function Dashboard() {
             Current status: <span className={themeConfig.headingColor}>{stageInfo.emoji} {stageInfo.label}</span>
           </p>
         </div>
+
+        {/* Rejection feedback banner */}
+        {rejectionReason && (
+          <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-5 flex items-start gap-4">
+            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <span className="text-xl">❌</span>
+            </div>
+            <div>
+              <p className="font-bold text-red-800">Changes Requested</p>
+              <p className="text-red-600 text-sm mt-0.5">{rejectionReason}</p>
+              <p className="text-red-500 text-xs mt-1.5">
+                Update your case sections above, then check with your supervisor once you&apos;re ready for another review.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Approved banner */}
         {approvalStage === 'approved' && (

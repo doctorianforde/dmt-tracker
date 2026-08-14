@@ -75,15 +75,15 @@ export default function SupervisorSignupPage() {
           </h2>
           <p className="text-violet-200 text-base leading-relaxed max-w-sm">
             Register your account using the invite code provided by your administrator.
-            Your role — supervisor or Dr. Paul — is set automatically based on which code you enter.
+            Your role — supervisor or lecturer — is set automatically based on which code you enter.
           </p>
         </div>
 
         <div className="space-y-3">
           {[
-            { icon: '👁️', text: 'View all student case records' },
-            { icon: '📊', text: 'Track progress across the entire cohort' },
-            { icon: '✅', text: 'Dr. Paul can issue Green Light approvals' },
+            { icon: '👁️', text: 'View your assigned students’ case records' },
+            { icon: '📊', text: 'Track progress across your cohort' },
+            { icon: '✅', text: 'Lecturers can issue Green Light approvals' },
           ].map(({ icon, text }) => (
             <div key={text} className="flex items-center gap-3 text-violet-100/80">
               <span>{icon}</span>

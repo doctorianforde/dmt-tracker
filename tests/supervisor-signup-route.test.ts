@@ -27,17 +27,17 @@ function makeRequest(body: unknown) {
 
 describe('POST /api/supervisor-signup', () => {
   const ORIGINAL_SUPERVISOR_CODE = process.env.SUPERVISOR_INVITE_CODE;
-  const ORIGINAL_DRPAUL_CODE = process.env.DRPAUL_INVITE_CODE;
+  const ORIGINAL_LECTURER_CODE = process.env.LECTURER_INVITE_CODE;
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.SUPERVISOR_INVITE_CODE = 'correct-code';
-    process.env.DRPAUL_INVITE_CODE = 'drpaul-code';
+    process.env.LECTURER_INVITE_CODE = 'lecturer-code';
   });
 
   afterEach(() => {
     process.env.SUPERVISOR_INVITE_CODE = ORIGINAL_SUPERVISOR_CODE;
-    process.env.DRPAUL_INVITE_CODE = ORIGINAL_DRPAUL_CODE;
+    process.env.LECTURER_INVITE_CODE = ORIGINAL_LECTURER_CODE;
   });
 
   it('rejects an incorrect invite code without creating an account', async () => {
@@ -74,17 +74,17 @@ describe('POST /api/supervisor-signup', () => {
     );
   });
 
-  it('creates a drpaul account when the drpaul code is submitted', async () => {
+  it('creates a lecturer account when the lecturer code is submitted', async () => {
     createUser.mockResolvedValue({ uid: 'uid-456' });
     docSet.mockResolvedValue(undefined);
 
-    const res = await POST(makeRequest({ name: 'Dr. Paul', email: 'paul@test.edu', password: 'secret1', code: 'drpaul-code' }));
+    const res = await POST(makeRequest({ name: 'Dr. Paul', email: 'paul@test.edu', password: 'secret1', code: 'lecturer-code' }));
     const data = await res.json();
 
     expect(res.status).toBe(200);
     expect(data).toEqual({ ok: true });
     expect(docSet).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Dr. Paul', email: 'paul@test.edu', role: 'drpaul' })
+      expect.objectContaining({ name: 'Dr. Paul', email: 'paul@test.edu', role: 'lecturer' })
     );
   });
 
@@ -101,13 +101,13 @@ describe('POST /api/supervisor-signup', () => {
 
   it('returns 500 when no invite codes are configured', async () => {
     process.env.SUPERVISOR_INVITE_CODE = '';
-    process.env.DRPAUL_INVITE_CODE = '';
+    process.env.LECTURER_INVITE_CODE = '';
     const res = await POST(makeRequest({ name: 'Dr. Jane', email: 'jane@test.edu', password: 'secret1', code: 'anything' }));
     expect(res.status).toBe(500);
     expect(createUser).not.toHaveBeenCalled();
   });
 
-  it('rejects the supervisor code when only the drpaul code is configured', async () => {
+  it('rejects the supervisor code when only the lecturer code is configured', async () => {
     process.env.SUPERVISOR_INVITE_CODE = '';
     const res = await POST(makeRequest({ name: 'Dr. Jane', email: 'jane@test.edu', password: 'secret1', code: 'correct-code' }));
     expect(res.status).toBe(403);

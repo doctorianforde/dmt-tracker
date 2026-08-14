@@ -5,47 +5,21 @@ import type { CaseRecord, ApprovalStage } from '@/types';
 
 interface Props {
   cases: CaseRecord[];
-  isDrPaul?: boolean;
+  isLecturer?: boolean;
   isSupervisor?: boolean;
-  supervisorUid?: string;
-  supervisorName?: string;
-  onApprove?: (caseNumber: string, role: 'supervisor1' | 'supervisor2' | 'drpaul', nextStage: ApprovalStage) => void;
-  onReject?: (caseNumber: string, role: 'supervisor1' | 'supervisor2' | 'drpaul', reason: string) => void;
+  onApprove?: (caseNumber: string, role: 'supervisor' | 'lecturer', nextStage: ApprovalStage) => void;
+  onReject?: (caseNumber: string, role: 'supervisor' | 'lecturer', reason: string) => void;
   onRevoke?: (caseNumber: string) => void;
 }
 
-function reviewerRole(
-  record: CaseRecord,
-  isDrPaul: boolean,
-  supervisorUid: string | undefined,
-  supervisorName: string | undefined
-): 'supervisor1' | 'supervisor2' | 'drpaul' {
-  if (isDrPaul) return 'drpaul';
-  return isAssignedSupervisor1(record, supervisorUid, supervisorName) ? 'supervisor1' : 'supervisor2';
+function reviewerRole(isLecturer: boolean): 'supervisor' | 'lecturer' {
+  return isLecturer ? 'lecturer' : 'supervisor';
 }
 
 function currentStageApproval(record: CaseRecord, stage: ApprovalStage) {
-  if (stage === 'supervisor1') return record.supervisor1Approval;
-  if (stage === 'supervisor2') return record.supervisor2Approval;
-  if (stage === 'drpaul') return record.drpaulApproval;
+  if (stage === 'supervisor') return record.supervisorApproval;
+  if (stage === 'lecturer') return record.lecturerApproval;
   return undefined;
-}
-
-// Backward-compatible matching: prefer UID, fall back to display name for legacy cases.
-function isAssignedSupervisor1(record: CaseRecord, supervisorUid?: string, supervisorName?: string) {
-  if (supervisorUid && record.supervisor1Uid) return record.supervisor1Uid === supervisorUid;
-  return !!supervisorName && record.supervisor1Name === supervisorName;
-}
-
-function isAssignedSupervisor2(record: CaseRecord, supervisorUid?: string, supervisorName?: string) {
-  if (supervisorUid && record.supervisor2Uid) return record.supervisor2Uid === supervisorUid;
-  return !!supervisorName && record.supervisor2Name === supervisorName;
-}
-
-// A case with no Supervisor 2 assigned doesn't need a Supervisor 2 approval to proceed.
-function supervisor2Satisfied(record: CaseRecord): boolean {
-  if (!record.supervisor2Uid && !record.supervisor2Name) return true;
-  return !!record.supervisor2Approval?.approved;
 }
 
 const SECTION_KEYS = ['intro', 'caseReport', 'discussion', 'conclusion', 'references'] as const;
@@ -59,79 +33,44 @@ const SECTION_LABELS: Record<string, string> = {
 
 const STAGE_CONFIG: Record<ApprovalStage, { label: string; color: string; dot: string }> = {
   pending: { label: 'Pending', color: 'bg-slate-100 text-slate-500', dot: 'bg-slate-300' },
-  supervisor1: { label: 'Sup. 1', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-400' },
-  supervisor2: { label: 'Sup. 2', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-400' },
-  drpaul: { label: 'Dr. Paul', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-400' },
+  supervisor: { label: 'Supervisor', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-400' },
+  lecturer: { label: 'Lecturer', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-400' },
   approved: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
 };
 
 function getNextStage(
   current: ApprovalStage,
   isSupervisor: boolean,
-  isDrPaul: boolean,
-  supervisorUid: string | undefined,
-  supervisorName: string | undefined,
+  isLecturer: boolean,
   record: CaseRecord
 ): ApprovalStage | null {
-  if (isSupervisor) {
-    const sup1 = isAssignedSupervisor1(record, supervisorUid, supervisorName);
-    const sup2 = isAssignedSupervisor2(record, supervisorUid, supervisorName);
-
-    if (sup1 && current === 'supervisor1' && !record.supervisor1Approval?.approved) {
-      return record.supervisor2Uid || record.supervisor2Name ? 'supervisor2' : 'drpaul';
-    }
-    if (sup2 && current === 'supervisor2' && !record.supervisor2Approval?.approved && record.supervisor1Approval?.approved) {
-      return 'drpaul';
-    }
+  if (isSupervisor && current === 'supervisor' && !record.supervisorApproval?.approved) {
+    return 'lecturer';
   }
-
-  if (isDrPaul && current === 'drpaul' && record.supervisor1Approval?.approved && supervisor2Satisfied(record)) {
+  if (isLecturer && current === 'lecturer' && record.supervisorApproval?.approved) {
     return 'approved';
   }
-
   return null;
 }
 
 function canApprove(
   stage: ApprovalStage,
   isSupervisor: boolean,
-  isDrPaul: boolean,
-  supervisorUid: string | undefined,
-  supervisorName: string | undefined,
+  isLecturer: boolean,
   record: CaseRecord
 ): boolean {
-  if (isSupervisor) {
-    const sup1 = isAssignedSupervisor1(record, supervisorUid, supervisorName);
-    const sup2 = isAssignedSupervisor2(record, supervisorUid, supervisorName);
-
-    if (sup1 && stage === 'supervisor1' && !record.supervisor1Approval?.approved) return true;
-    if (sup2 && stage === 'supervisor2' && !record.supervisor2Approval?.approved && record.supervisor1Approval?.approved) return true;
-  }
-
-  if (isDrPaul && stage === 'drpaul' && !record.drpaulApproval?.approved && record.supervisor1Approval?.approved && supervisor2Satisfied(record)) {
-    return true;
-  }
-
+  if (isSupervisor && stage === 'supervisor' && !record.supervisorApproval?.approved) return true;
+  if (isLecturer && stage === 'lecturer' && !record.lecturerApproval?.approved && record.supervisorApproval?.approved) return true;
   return false;
 }
 
-function getStageButtonLabel(next: ApprovalStage, supervisorUid: string | undefined, supervisorName: string | undefined, record: CaseRecord): string {
-  const isSupervisor1 = isAssignedSupervisor1(record, supervisorUid, supervisorName);
-  const isSupervisor2 = isAssignedSupervisor2(record, supervisorUid, supervisorName);
-
-  if (isSupervisor1) {
-    if (next === 'supervisor2') return '✅ Approve & Send to Sup. 2';
-  }
-  if (isSupervisor2) {
-    if (next === 'drpaul') return '🟡 Approve & Send to Dr. Paul';
-  }
-  if (next === 'approved') {
-    return '✅ Grant Final Approval';
-  }
+function getStageButtonLabel(next: ApprovalStage): string {
+  if (next === 'lecturer') return '✅ Approve & Send to Lecturer';
+  if (next === 'approved') return '✅ Grant Final Approval';
   return 'Advance';
 }
 
-export default function CaseTable({ cases, isDrPaul = false, isSupervisor = false, supervisorUid, supervisorName, onApprove, onReject, onRevoke }: Props) {
+export default function CaseTable({ cases, isLecturer = false, isSupervisor = false, onApprove, onReject, onRevoke }: Props) {
   const [search, setSearch] = useState('');
   const [rejectingCase, setRejectingCase] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -148,7 +87,7 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
 
   const confirmReject = (record: CaseRecord) => {
     if (!rejectReason.trim()) return;
-    const role = reviewerRole(record, isDrPaul, supervisorUid, supervisorName);
+    const role = reviewerRole(isLecturer);
     onReject?.(record.caseNumber, role, rejectReason.trim());
     cancelReject();
   };
@@ -169,7 +108,11 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
       <div className="bg-white border border-slate-200 rounded-2xl text-center py-20">
         <p className="text-5xl mb-4">📋</p>
         <p className="font-semibold text-slate-700">No case records yet</p>
-        <p className="text-sm text-slate-400 mt-1">Student submissions will appear here</p>
+        <p className="text-sm text-slate-400 mt-1">
+          {isSupervisor && !isLecturer
+            ? 'Cases for your assigned students will appear here'
+            : 'Student submissions will appear here'}
+        </p>
       </div>
     );
   }
@@ -222,7 +165,7 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
                 <th className="text-left px-4 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden sm:table-cell">Year</th>
                 <th className="text-center px-4 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Sections</th>
                 <th className="text-center px-4 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Stage</th>
-                {(isSupervisor || isDrPaul) && (
+                {(isSupervisor || isLecturer) && (
                   <th className="text-center px-4 py-3.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Action</th>
                 )}
               </tr>
@@ -232,17 +175,15 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
                 const completedCount = Object.values(rec.sections).filter(Boolean).length;
                 const stage: ApprovalStage = rec.approvalStage ?? (rec.greenLight ? 'approved' : 'pending');
                 const stageStyle = STAGE_CONFIG[stage];
-                const nextStage = getNextStage(stage, isSupervisor, isDrPaul, supervisorUid, supervisorName, rec);
-                const canApproveCase = canApprove(stage, isSupervisor, isDrPaul, supervisorUid, supervisorName, rec);
+                const nextStage = getNextStage(stage, isSupervisor, isLecturer, rec);
+                const canApproveCase = canApprove(stage, isSupervisor, isLecturer, rec);
 
                 return (
                   <tr key={rec.caseNumber} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-5 py-4">
                       <p className="font-semibold text-slate-900">{rec.studentName}</p>
-                      {(rec.supervisor1Name || rec.supervisor2Name) && (
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {[rec.supervisor1Name, rec.supervisor2Name].filter(Boolean).join(' · ')}
-                        </p>
+                      {rec.supervisorName && (
+                        <p className="text-xs text-slate-400 mt-0.5">{rec.supervisorName}</p>
                       )}
                     </td>
                     <td className="px-4 py-4">
@@ -274,35 +215,28 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
                     <td className="px-4 py-4 text-center">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${stageStyle.color}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${stageStyle.dot}`} />
-                        {stage === 'supervisor1' && rec.supervisor1Name
-                          ? rec.supervisor1Name
-                          : stage === 'supervisor2' && rec.supervisor2Name
-                          ? rec.supervisor2Name
-                          : stageStyle.label}
+                        {stage === 'supervisor' && rec.supervisorName ? rec.supervisorName : stageStyle.label}
                       </span>
                     </td>
-                    {(isSupervisor || isDrPaul) && (
+                    {(isSupervisor || isLecturer) && (
                       <td className="px-4 py-4 text-center">
                         <div className="flex flex-col items-center gap-1">
-                          {stage === 'supervisor1' && rec.supervisor1Approval?.approved && (
-                            <span className="text-xs text-emerald-600 font-semibold">✅ Approved by Sup. 1</span>
+                          {stage === 'supervisor' && rec.supervisorApproval?.approved && (
+                            <span className="text-xs text-emerald-600 font-semibold">✅ Approved by Supervisor</span>
                           )}
-                          {stage === 'supervisor2' && rec.supervisor2Approval?.approved && (
-                            <span className="text-xs text-emerald-600 font-semibold">✅ Approved by Sup. 2</span>
-                          )}
-                          {stage === 'drpaul' && rec.drpaulApproval?.approved && (
-                            <span className="text-xs text-emerald-600 font-semibold">✅ Approved by Dr. Paul</span>
+                          {stage === 'lecturer' && rec.lecturerApproval?.approved && (
+                            <span className="text-xs text-emerald-600 font-semibold">✅ Approved by Lecturer</span>
                           )}
                           {canApproveCase && nextStage && rejectingCase !== rec.caseNumber && (
                             <div className="flex flex-col items-center gap-1">
                               <button
                                 onClick={() => {
-                                  const role = reviewerRole(rec, isDrPaul, supervisorUid, supervisorName);
+                                  const role = reviewerRole(isLecturer);
                                   onApprove?.(rec.caseNumber, role, nextStage);
                                 }}
                                 className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 whitespace-nowrap"
                               >
-                                {getStageButtonLabel(nextStage, supervisorUid, supervisorName, rec)}
+                                {getStageButtonLabel(nextStage)}
                               </button>
                               <button
                                 onClick={() => startReject(rec.caseNumber)}
@@ -350,7 +284,7 @@ export default function CaseTable({ cases, isDrPaul = false, isSupervisor = fals
                               ❌ Rejected: {currentStageApproval(rec, stage)?.rejectionReason}
                             </span>
                           )}
-                          {isDrPaul && stage === 'approved' && (
+                          {isLecturer && stage === 'approved' && (
                             <button
                               onClick={() => onRevoke?.(rec.caseNumber)}
                               className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"

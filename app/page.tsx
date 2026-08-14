@@ -79,7 +79,7 @@ export default function LoginPage() {
             { icon: '🎨', text: 'Choose your own dashboard theme' },
             { icon: '🟠', text: 'Color-coded approval pipeline' },
             { icon: '⏰', text: 'Deadline reminders & accountability tools' },
-            { icon: '✅', text: 'Receive Dr. Paul\'s final approval' },
+            { icon: '✅', text: 'Receive your Lecturer\'s final approval' },
           ].map(({ icon, text }) => (
             <div key={text} className="flex items-center gap-3 text-sky-100/80">
               <span>{icon}</span>

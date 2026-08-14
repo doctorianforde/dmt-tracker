@@ -9,7 +9,7 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import { auth } from './firebase';
-import { getUserProfile, createUserProfile } from './firestore';
+import { getUserProfile, createUserProfile, logAccess } from './firestore';
 import type { UserProfile } from '@/types';
 
 interface AuthContextType {
@@ -60,6 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const result = await signInWithEmailAndPassword(auth, email, password);
     const profile = await getUserProfile(result.user.uid);
     setUserProfile(profile);
+    if (profile) {
+      logAccess({ actorUid: profile.uid, actorName: profile.name, actorRole: profile.role, action: 'login' });
+    }
   };
 
   const signUp = async (email: string, password: string, name: string) => {

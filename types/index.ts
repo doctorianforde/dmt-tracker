@@ -1,6 +1,6 @@
-export type UserRole = 'student' | 'supervisor' | 'drpaul';
+export type UserRole = 'student' | 'supervisor' | 'lecturer';
 
-export type ApprovalStage = 'pending' | 'supervisor1' | 'supervisor2' | 'drpaul' | 'approved';
+export type ApprovalStage = 'pending' | 'supervisor' | 'lecturer' | 'approved';
 
 export type ThemeChoice = 'light' | 'dark' | 'flower' | 'pastel' | 'football' | 'mario';
 
@@ -54,6 +54,9 @@ export interface UserProfile {
   startYear?: number;
   classYear?: number;
   theme?: ThemeChoice;
+  // Set only by the Lecturer, via the "Manage Students" panel.
+  assignedSupervisorUid?: string;
+  assignedSupervisorName?: string;
 }
 
 export interface CaseSections {
@@ -81,14 +84,24 @@ export interface CaseRecord {
   sections: CaseSections;
   greenLight: boolean;
   approvalStage?: ApprovalStage;
-  supervisor1Uid?: string;
-  supervisor1Name?: string;
-  supervisor2Uid?: string;
-  supervisor2Name?: string;
-  supervisor1Approval?: SupervisorApproval;
-  supervisor2Approval?: SupervisorApproval;
-  drpaulApproval?: SupervisorApproval;
+  supervisorUid?: string;
+  supervisorName?: string;
+  supervisorApproval?: SupervisorApproval;
+  lecturerApproval?: SupervisorApproval;
   customDeadline?: string;
   extensionReason?: string;
   updatedAt?: Date | null;
+}
+
+export type AccessLogAction = 'login' | 'view_cases' | 'approve' | 'reject' | 'revoke' | 'assign_supervisor';
+
+export interface AccessLogEntry {
+  id?: string;
+  actorUid: string;
+  actorName: string;
+  actorRole: UserRole;
+  action: AccessLogAction;
+  targetId?: string;
+  targetLabel?: string;
+  createdAt?: Date | null;
 }

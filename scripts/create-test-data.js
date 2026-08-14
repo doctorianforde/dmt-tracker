@@ -2,27 +2,28 @@
 
 /**
  * Test Data Seeding Script
- * Creates supervisor and student test accounts with sample case data
+ * Creates supervisor, lecturer, and student test accounts with sample case data.
  *
- * Usage: node scripts/create-test-data.js
+ * Usage: node --env-file=.env.local scripts/create-test-data.js
+ *
+ * Requires FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, and
+ * FIREBASE_ADMIN_PRIVATE_KEY in .env.local (see .env.local.example).
  */
 
 const admin = require('firebase-admin');
-const path = require('path');
 
-// Initialize Firebase Admin
-const serviceAccountPath = path.join(__dirname, '../firebase-service-key.json');
-try {
-  const serviceAccount = require(serviceAccountPath);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: process.env.FIREBASE_DATABASE_URL || undefined,
-  });
-} catch (error) {
-  console.error('❌ Error: Could not load firebase-service-key.json');
-  console.error('Please create this file with your Firebase service account credentials.');
+const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
+const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+if (!projectId || !clientEmail || !privateKey) {
+  console.error('❌ Missing FIREBASE_ADMIN_* env vars. Run with: node --env-file=.env.local scripts/create-test-data.js');
   process.exit(1);
 }
+
+admin.initializeApp({
+  credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
+});
 
 const auth = admin.auth();
 const db = admin.firestore();
@@ -42,10 +43,10 @@ const testSupervisors = [
     role: 'supervisor',
   },
   {
-    email: 'drpaul@test.edu',
+    email: 'lecturer@test.edu',
     password: 'Test1234!',
     name: 'Dr. Paul',
-    role: 'drpaul',
+    role: 'lecturer',
   },
 ];
 
@@ -57,6 +58,7 @@ const testStudents = [
     caseNumber: 'DMT-2024-001',
     startYear: 2024,
     classYear: 4,
+    supervisorEmail: 'supervisor1@test.edu',
   },
   {
     email: 'student2@test.edu',
@@ -65,6 +67,7 @@ const testStudents = [
     caseNumber: 'DMT-2024-002',
     startYear: 2024,
     classYear: 4,
+    supervisorEmail: 'supervisor1@test.edu',
   },
   {
     email: 'student3@test.edu',
@@ -73,6 +76,7 @@ const testStudents = [
     caseNumber: 'DMT-2024-003',
     startYear: 2024,
     classYear: 3,
+    supervisorEmail: 'supervisor2@test.edu',
   },
   {
     email: 'student4@test.edu',
@@ -81,6 +85,7 @@ const testStudents = [
     caseNumber: 'DMT-2024-004',
     startYear: 2024,
     classYear: 3,
+    supervisorEmail: 'supervisor2@test.edu',
   },
 ];
 
@@ -94,30 +99,30 @@ const testCases = [
   {
     caseNumber: 'DMT-2024-002',
     studentName: 'Bob Smith',
-    approvalStage: 'supervisor1',
+    approvalStage: 'supervisor',
     sections: { intro: true, caseReport: true, discussion: true, conclusion: true, references: true },
-    supervisor1Approval: { approved: false },
+    supervisorApproval: { approved: false },
   },
   {
     caseNumber: 'DMT-2024-003',
     studentName: 'Carol Davis',
-    approvalStage: 'supervisor2',
+    approvalStage: 'lecturer',
     sections: { intro: true, caseReport: true, discussion: true, conclusion: true, references: true },
-    supervisor1Approval: { approved: true, approvedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
+    supervisorApproval: { approved: true, approvedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
   },
   {
     caseNumber: 'DMT-2024-004',
     studentName: 'David Wilson',
-    approvalStage: 'drpaul',
+    approvalStage: 'lecturer',
     sections: { intro: true, caseReport: true, discussion: true, conclusion: true, references: true },
-    supervisor1Approval: { approved: true, approvedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
-    supervisor2Approval: { approved: true, approvedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) },
+    supervisorApproval: { approved: true, approvedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
   },
 ];
 
 async function createTestData() {
   try {
     console.log('\n🔐 Creating test supervisors...');
+    const supervisorUidByEmail = {};
     for (const supervisor of testSupervisors) {
       try {
         const userRecord = await auth.createUser({
@@ -133,9 +138,12 @@ async function createTestData() {
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
+        supervisorUidByEmail[supervisor.email] = userRecord.uid;
         console.log(`  ✅ ${supervisor.role}: ${supervisor.email}`);
       } catch (error) {
         if (error.code === 'auth/email-already-exists') {
+          const existing = await auth.getUserByEmail(supervisor.email);
+          supervisorUidByEmail[supervisor.email] = existing.uid;
           console.log(`  ⚠️  ${supervisor.email} already exists (skipped)`);
         } else {
           throw error;
@@ -145,6 +153,7 @@ async function createTestData() {
 
     console.log('\n👥 Creating test students...');
     for (const student of testStudents) {
+      const supervisor = testSupervisors.find((s) => s.email === student.supervisorEmail);
       try {
         const userRecord = await auth.createUser({
           email: student.email,
@@ -159,10 +168,12 @@ async function createTestData() {
           caseNumber: student.caseNumber,
           startYear: student.startYear,
           classYear: student.classYear,
+          assignedSupervisorUid: supervisorUidByEmail[student.supervisorEmail],
+          assignedSupervisorName: supervisor?.name,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        console.log(`  ✅ ${student.name} (${student.email})`);
+        console.log(`  ✅ ${student.name} (${student.email}) → assigned to ${supervisor?.name}`);
       } catch (error) {
         if (error.code === 'auth/email-already-exists') {
           console.log(`  ⚠️  ${student.email} already exists (skipped)`);
@@ -174,13 +185,15 @@ async function createTestData() {
 
     console.log('\n📋 Creating test case records...');
     for (const testCase of testCases) {
+      const student = testStudents.find((s) => s.caseNumber === testCase.caseNumber);
+      const supervisor = testSupervisors.find((s) => s.email === student?.supervisorEmail);
       const caseData = {
         ...testCase,
         studentUid: 'test-student-uid',
         submitted: testCase.approvalStage !== 'pending',
         greenLight: testCase.approvalStage === 'approved',
-        supervisor1Name: 'Dr. Davin Powdhar',
-        supervisor2Name: testCase.approvalStage === 'supervisor2' || testCase.approvalStage === 'drpaul' || testCase.approvalStage === 'approved' ? 'Dr. Windale' : undefined,
+        supervisorUid: testCase.approvalStage !== 'pending' ? supervisorUidByEmail[student?.supervisorEmail] : undefined,
+        supervisorName: testCase.approvalStage !== 'pending' ? supervisor?.name : undefined,
         customDeadline: '2026-06-30',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
@@ -191,13 +204,13 @@ async function createTestData() {
 
     console.log('\n✨ Test data created successfully!\n');
     console.log('📝 Test Accounts:');
-    console.log('\n🔐 Supervisors:');
+    console.log('\n🔐 Supervisors / Lecturer:');
     testSupervisors.forEach(s => {
       console.log(`  • ${s.role}: ${s.email} / ${s.password}`);
     });
     console.log('\n👥 Students:');
     testStudents.forEach(s => {
-      console.log(`  • ${s.name}: ${s.email} / ${s.password}`);
+      console.log(`  • ${s.name}: ${s.email} / ${s.password} (assigned to ${s.supervisorEmail})`);
     });
     console.log('\n📊 Case Statuses:');
     testCases.forEach(c => {

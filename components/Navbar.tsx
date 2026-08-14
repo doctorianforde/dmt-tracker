@@ -6,19 +6,19 @@ import { useRouter } from 'next/navigation';
 const ROLE_LABELS: Record<string, string> = {
   student: 'Student',
   supervisor: 'Supervisor',
-  drpaul: 'Dr. Paul',
+  lecturer: 'Lecturer',
 };
 
 const ROLE_BADGE: Record<string, string> = {
   student: 'bg-sky-100 text-sky-800',
   supervisor: 'bg-violet-100 text-violet-800',
-  drpaul: 'bg-emerald-100 text-emerald-800',
+  lecturer: 'bg-emerald-100 text-emerald-800',
 };
 
 const ROLE_BADGE_DARK: Record<string, string> = {
   student: 'bg-sky-900 text-sky-300',
   supervisor: 'bg-violet-900 text-violet-300',
-  drpaul: 'bg-emerald-900 text-emerald-300',
+  lecturer: 'bg-emerald-900 text-emerald-300',
 };
 
 interface NavbarProps {

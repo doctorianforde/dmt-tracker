@@ -29,7 +29,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=...
 
 ```
 SUPERVISOR_INVITE_CODE=your-supervisor-invite-code
-DRPAUL_INVITE_CODE=your-drpaul-invite-code
+LECTURER_INVITE_CODE=your-lecturer-invite-code
 ```
 
 4. Generate a service-account key for the Admin SDK: Project Settings → Service
@@ -64,20 +64,20 @@ service firebase.storage {
 }
 ```
 
-## 5. Create Supervisor / Dr. Paul Accounts
+## 5. Create Supervisor / Lecturer Accounts
 
-Students self-register on `/`. Staff accounts (supervisor and Dr. Paul) work
+Students self-register on `/`. Staff accounts (supervisor and lecturer) work
 differently, since they need to be gated by an invite code without exposing
 that code to the browser — `/supervisor-signup` posts to a server-side API
 route (`/api/supervisor-signup`) that checks the submitted code against both
-`SUPERVISOR_INVITE_CODE` and `DRPAUL_INVITE_CODE` and creates the account
+`SUPERVISOR_INVITE_CODE` and `LECTURER_INVITE_CODE` and creates the account
 with the Firebase Admin SDK. The role is whichever code matched — the client
 never sends a role directly, so there's nothing to spoof by editing the form:
 
 1. Go to `http://localhost:3000/supervisor-signup`
 2. Fill in the name, email, password, and invite code
 3. Entering `SUPERVISOR_INVITE_CODE` creates a `supervisor`; entering
-   `DRPAUL_INVITE_CODE` creates `drpaul`
+   `LECTURER_INVITE_CODE` creates a `lecturer`
 
 `scripts/create-supervisor.mjs` still works as a fallback for one-off admin
 provisioning directly via the Admin SDK, bypassing invite codes entirely:
@@ -87,9 +87,21 @@ provisioning directly via the Admin SDK, bypassing invite codes entirely:
 node --env-file=.env.local scripts/create-supervisor.mjs
 ```
 
-Valid roles in Firestore are: `student`, `supervisor`, `drpaul`. `firestore.rules`
+Valid roles in Firestore are: `student`, `supervisor`, `lecturer`. `firestore.rules`
 only lets a client create their own profile with `role: 'student'` — anything
 else has to go through the Admin SDK, which bypasses the rules by design.
+
+### Assigning students to supervisors
+
+Students no longer pick their own supervisor. The Lecturer assigns (and can
+reassign) each student to a supervisor from the "Manage Students" panel on
+their dashboard (`/supervisor`, visible only to the `lecturer` role). A
+student's assignment lives on their profile
+(`users/{uid}.assignedSupervisorUid/Name`) and is copied onto their case
+record (`cases/{caseNumber}.supervisorUid/Name`) at creation time, kept in
+sync by the Lecturer's reassignment action. A supervisor only ever sees
+cases where `supervisorUid` matches their own uid — enforced in
+`firestore.rules`, not just hidden in the UI.
 
 ## 6. Local Development
 
@@ -115,7 +127,7 @@ npm run test     # Vitest
 1. Push this folder to a GitHub repository
 2. Go to [vercel.com](https://vercel.com) → New Project → Import from GitHub
 3. Add all `NEXT_PUBLIC_FIREBASE_*` variables, `SUPERVISOR_INVITE_CODE`,
-   `DRPAUL_INVITE_CODE`, and the three `FIREBASE_ADMIN_*` variables, in Vercel
+   `LECTURER_INVITE_CODE`, and the three `FIREBASE_ADMIN_*` variables, in Vercel
    project settings. Paste `FIREBASE_ADMIN_PRIVATE_KEY` exactly as it appears
    in the downloaded JSON (Vercel's env var editor handles the embedded
    newlines fine).
@@ -125,6 +137,6 @@ npm run test     # Vitest
 
 | Role | Login | Can Do |
 |------|-------|--------|
-| Student | Self-register on `/` | View/edit own profile and case, select supervisors, submit for review |
-| Supervisor | Sign up via `/supervisor-signup` with `SUPERVISOR_INVITE_CODE` | View all cases, approve cases assigned by students |
-| Dr. Paul | Sign up via `/supervisor-signup` with `DRPAUL_INVITE_CODE` | View all cases, grant/revoke final approval |
+| Student | Self-register on `/` | View/edit own profile and case, submit for review once a supervisor is assigned |
+| Supervisor | Sign up via `/supervisor-signup` with `SUPERVISOR_INVITE_CODE` | View and approve cases for their assigned students only |
+| Lecturer | Sign up via `/supervisor-signup` with `LECTURER_INVITE_CODE` | View all cases, assign/reassign students to supervisors, grant/revoke final approval |

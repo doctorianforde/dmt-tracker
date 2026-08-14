@@ -14,14 +14,14 @@ interface SupervisorSignupBody {
 // name its own role directly, so there's nothing to spoof by editing the form.
 function roleForInviteCode(code: string): UserRole | null {
   const supervisorCode = process.env.SUPERVISOR_INVITE_CODE?.trim();
-  const drpaulCode = process.env.DRPAUL_INVITE_CODE?.trim();
+  const lecturerCode = process.env.LECTURER_INVITE_CODE?.trim();
   if (supervisorCode && code === supervisorCode) return 'supervisor';
-  if (drpaulCode && code === drpaulCode) return 'drpaul';
+  if (lecturerCode && code === lecturerCode) return 'lecturer';
   return null;
 }
 
 export async function POST(request: Request) {
-  if (!process.env.SUPERVISOR_INVITE_CODE && !process.env.DRPAUL_INVITE_CODE) {
+  if (!process.env.SUPERVISOR_INVITE_CODE && !process.env.LECTURER_INVITE_CODE) {
     return NextResponse.json(
       { error: 'Invite codes are not configured. Contact the administrator.' },
       { status: 500 }

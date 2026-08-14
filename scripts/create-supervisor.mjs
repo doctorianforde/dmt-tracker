@@ -1,4 +1,4 @@
-// One-off script to create a privileged (supervisor/drpaul) account in Firebase.
+// One-off script to create a privileged (supervisor/lecturer) account in Firebase.
 // Uses the Admin SDK directly, since firestore.rules no longer let a client
 // self-assign anything but the 'student' role — see /api/supervisor-signup
 // for the invite-code-gated supervisor sign-up flow this script bypasses.
@@ -16,9 +16,9 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 // ── Edit these before running ─────────────────────────────────────
 const ACCOUNT = {
   name: 'Dr. Paul',
-  email: 'drpaul@test.edu',
+  email: 'lecturer@test.edu',
   password: 'TestSuper123!',
-  role: 'drpaul', // supervisor | drpaul
+  role: 'lecturer', // supervisor | lecturer
 };
 // ─────────────────────────────────────────────────────────────────
 

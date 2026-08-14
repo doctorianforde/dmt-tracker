@@ -14,12 +14,12 @@ service cloud.firestore {
       return isAuthed() && userDoc().role == 'supervisor';
     }
 
-    function isDrPaul() {
-      return isAuthed() && userDoc().role == 'drpaul';
+    function isLecturer() {
+      return isAuthed() && userDoc().role == 'lecturer';
     }
 
     function isStaff() {
-      return isAuthed() && userDoc().role in ['supervisor', 'drpaul'];
+      return isAuthed() && userDoc().role in ['supervisor', 'lecturer'];
     }
 
     function isStudent() {
@@ -28,45 +28,65 @@ service cloud.firestore {
 
     // ── Users ────────────────────────────────────────────────────────────────
     match /users/{userId} {
-      // All authenticated users can read user profiles so students can discover supervisors.
-      // In a stricter deployment, expose supervisors through a dedicated public collection.
-      allow read: if isAuthed();
+      // Everyone can read their own profile; the Lecturer can read any profile
+      // (needed for the "Manage Students" assignment panel). Supervisors don't
+      // need to read other profiles — case records carry the student info
+      // they need as a denormalized copy.
+      allow get: if isAuthed() && (request.auth.uid == userId || isLecturer());
+      allow list: if isLecturer();
 
-      // Clients may only self-register as a student. Supervisor and Dr. Paul
+      // Clients may only self-register as a student. Supervisor and Lecturer
       // accounts are created server-side (via the Admin SDK, which bypasses
       // these rules) after verifying an invite code — see /api/supervisor-signup.
       allow create: if request.auth.uid == userId
         && request.resource.data.role == 'student';
 
-      // Users can update their own profile but cannot change their role
-      allow update: if request.auth.uid == userId
-        && !('role' in request.resource.data.diff(resource.data).affectedKeys());
+      // Users can update their own profile but cannot change their role or
+      // self-assign a supervisor. The Lecturer may update only the assignment
+      // fields on any user's profile.
+      allow update: if
+        (request.auth.uid == userId
+          && !request.resource.data.diff(resource.data).affectedKeys()
+               .hasAny(['role', 'assignedSupervisorUid', 'assignedSupervisorName']))
+        || (isLecturer()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['assignedSupervisorUid', 'assignedSupervisorName']));
     }
 
     // ── Cases ────────────────────────────────────────────────────────────────
     match /cases/{caseNumber} {
       // Students read their own case (matched via studentUid); staff read all
-      allow read: if isStaff()
+      // cases they're staff on — supervisors only the case they're assigned to.
+      allow read: if isLecturer()
+        || (isSupervisor() && resource.data.supervisorUid == request.auth.uid)
         || (isStudent() && resource.data.studentUid == request.auth.uid);
+
+      // A student's case may only name the supervisor already assigned to them
+      // by the Lecturer — they can't stamp an arbitrary supervisorUid at creation.
+      function assignedSupervisorMatches() {
+        return !('supervisorUid' in request.resource.data)
+          || request.resource.data.supervisorUid == userDoc().assignedSupervisorUid;
+      }
 
       // Students create a case — ownership proven by studentUid in the new document
       allow create: if isStudent()
         && request.resource.data.studentUid == request.auth.uid
-        && request.resource.data.greenLight == false;
+        && request.resource.data.greenLight == false
+        && assignedSupervisorMatches();
 
       // Privileged fields that students can never modify
       function protectedCaseFields() {
-        return ['greenLight', 'supervisor1Approval', 'supervisor2Approval', 'drpaulApproval'];
+        return ['greenLight', 'supervisorApproval', 'lecturerApproval', 'supervisorUid', 'supervisorName'];
       }
 
       function studentCanUpdateCase() {
         let affected = request.resource.data.diff(resource.data).affectedKeys();
-        // Students may submit their case (pending -> supervisor1) but cannot change other stages,
+        // Students may submit their case (pending -> supervisor) but cannot change other stages,
         // and can never touch the protected fields above.
         return !affected.hasAny(protectedCaseFields())
           && (!affected.hasAny(['approvalStage'])
               || (resource.data.approvalStage == 'pending'
-                  && request.resource.data.approvalStage == 'supervisor1'));
+                  && request.resource.data.approvalStage == 'supervisor'));
       }
 
       allow update: if
@@ -75,15 +95,31 @@ service cloud.firestore {
           && resource.data.studentUid == request.auth.uid
           && studentCanUpdateCase())
         ||
-        // Supervisors can record their own approval and advance the stage
+        // The assigned supervisor can record their own approval and advance the stage
         (isSupervisor()
+          && resource.data.supervisorUid == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['approvalStage', 'supervisor1Approval', 'supervisor2Approval', 'updatedAt']))
+               .hasOnly(['approvalStage', 'supervisorApproval', 'updatedAt']))
         ||
-        // Dr. Paul can give/revoke final green light and record final approval
-        (isDrPaul()
+        // The Lecturer can give/revoke final green light, record final approval,
+        // and reassign a case to a different supervisor.
+        (isLecturer()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['greenLight', 'approvalStage', 'drpaulApproval', 'updatedAt']));
+               .hasOnly(['greenLight', 'approvalStage', 'lecturerApproval', 'supervisorUid', 'supervisorName', 'updatedAt']));
+    }
+
+    // ── Access Log ───────────────────────────────────────────────────────────
+    match /accessLogs/{logId} {
+      // Only the Lecturer can read the audit trail.
+      allow read: if isLecturer();
+
+      // Any authenticated user may write a log entry, but only one attributed
+      // to themselves — they can't log an action as someone else. Entries are
+      // append-only: no edits or deletes, so a log can't be altered after the
+      // fact (though a user could still choose not to log — see the note in
+      // lib/firestore.ts).
+      allow create: if isAuthed() && request.resource.data.actorUid == request.auth.uid;
+      allow update, delete: if false;
     }
   }
 }

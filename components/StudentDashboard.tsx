@@ -8,14 +8,13 @@ import DeadlineCountdown from '@/components/DeadlineCountdown';
 import ProgressChecklist from '@/components/ProgressChecklist';
 import {
   getCaseRecord,
-  getUsersByRole,
   saveCaseRecord,
   submitCaseForReview,
   updateUserProfile,
 } from '@/lib/firestore';
-import type { CaseRecord, CaseSections, ApprovalStage, ThemeChoice, UserProfile, UserRole } from '@/types';
+import type { CaseRecord, CaseSections, ApprovalStage, ThemeChoice, UserRole } from '@/types';
 import { THEMES, THEME_ORDER } from '@/lib/themes';
-import { DEFAULT_DEADLINE, START_YEAR_MIN, START_YEAR_MAX, CLASS_YEARS, SUPERVISORS } from '@/lib/config';
+import { DEFAULT_DEADLINE, START_YEAR_MIN, START_YEAR_MAX, CLASS_YEARS } from '@/lib/config';
 
 const DEFAULT_SECTIONS: CaseSections = {
   intro: false,
@@ -27,20 +26,16 @@ const DEFAULT_SECTIONS: CaseSections = {
 
 const STAGE_CONFIG: Record<ApprovalStage, { label: string; color: string; step: number; emoji: string }> = {
   pending: { label: 'Not Yet Submitted', color: 'bg-slate-200', step: 0, emoji: '⏳' },
-  supervisor1: { label: 'Supervisor 1 Reviewing', color: 'bg-orange-400', step: 1, emoji: '🟠' },
-  supervisor2: { label: 'Supervisor 2 Reviewing', color: 'bg-amber-400', step: 2, emoji: '🟡' },
-  drpaul: { label: 'Dr. Paul Reviewing', color: 'bg-yellow-300', step: 3, emoji: '🔆' },
-  approved: { label: 'Approved!', color: 'bg-emerald-500', step: 4, emoji: '✅' },
+  supervisor: { label: 'Supervisor Reviewing', color: 'bg-orange-400', step: 1, emoji: '🟠' },
+  lecturer: { label: 'Lecturer Reviewing', color: 'bg-yellow-300', step: 2, emoji: '🔆' },
+  approved: { label: 'Approved!', color: 'bg-emerald-500', step: 3, emoji: '✅' },
 };
 
 const PIPELINE_STEPS: { stage: ApprovalStage; label: string; color: string }[] = [
-  { stage: 'supervisor1', label: 'Supervisor 1', color: 'bg-orange-400' },
-  { stage: 'supervisor2', label: 'Supervisor 2', color: 'bg-amber-400' },
-  { stage: 'drpaul', label: 'Dr. Paul', color: 'bg-yellow-300' },
+  { stage: 'supervisor', label: 'Supervisor', color: 'bg-orange-400' },
+  { stage: 'lecturer', label: 'Lecturer', color: 'bg-yellow-300' },
   { stage: 'approved', label: 'Approved', color: 'bg-emerald-500' },
 ];
-
-export { SUPERVISORS };
 
 // Defined once at module scope — see the same note in SupervisorDashboard.tsx.
 const STUDENT_ROLES: UserRole[] = ['student'];
@@ -68,32 +63,6 @@ function Dashboard() {
   const [classYear, setClassYear] = useState(1);
   const [customDeadline, setCustomDeadline] = useState('');
   const [sections, setSections] = useState<CaseSections>(DEFAULT_SECTIONS);
-  const [supervisor1Uid, setSupervisor1Uid] = useState('');
-  const [supervisor1Name, setSupervisor1Name] = useState('');
-  const [supervisor2Uid, setSupervisor2Uid] = useState('');
-  const [supervisor2Name, setSupervisor2Name] = useState('');
-  const [supervisors, setSupervisors] = useState<UserProfile[]>([]);
-
-  const supervisorOptions = supervisors.length > 0
-    ? supervisors
-    : SUPERVISORS.map((name) => ({ uid: name, name }));
-
-  const getSupervisorName = (uid: string) =>
-    supervisorOptions.find((s) => s.uid === uid)?.name ?? '';
-
-  const handleSupervisor1Change = (uid: string) => {
-    setSupervisor1Uid(uid);
-    setSupervisor1Name(getSupervisorName(uid));
-    if (supervisor2Uid === uid) {
-      setSupervisor2Uid('');
-      setSupervisor2Name('');
-    }
-  };
-
-  const handleSupervisor2Change = (uid: string) => {
-    setSupervisor2Uid(uid);
-    setSupervisor2Name(getSupervisorName(uid));
-  };
 
   const [extensionReason, setExtensionReason] = useState('');
   const [showExtension, setShowExtension] = useState(false);
@@ -108,11 +77,6 @@ function Dashboard() {
       try {
         if (userProfile.theme) setTheme(userProfile.theme);
 
-        const [supervisorList] = await Promise.all([
-          getUsersByRole('supervisor').catch(() => []),
-        ]);
-        setSupervisors(supervisorList);
-
         if (userProfile.caseNumber) {
           setCaseNumber(userProfile.caseNumber);
           setStartYear(userProfile.startYear ?? new Date().getFullYear());
@@ -121,10 +85,6 @@ function Dashboard() {
           if (rec) {
             setCaseRecord(rec);
             setSections(rec.sections ?? DEFAULT_SECTIONS);
-            setSupervisor1Uid(rec.supervisor1Uid ?? '');
-            setSupervisor1Name(rec.supervisor1Name ?? '');
-            setSupervisor2Uid(rec.supervisor2Uid ?? '');
-            setSupervisor2Name(rec.supervisor2Name ?? '');
             setCustomDeadline(rec.customDeadline ?? '');
             setExtensionReason(rec.extensionReason ?? '');
           }
@@ -149,7 +109,7 @@ function Dashboard() {
     setSubmitting(true);
     try {
       await submitCaseForReview(userProfile.caseNumber);
-      setCaseRecord((prev) => (prev ? { ...prev, approvalStage: 'supervisor1' } : prev));
+      setCaseRecord((prev) => (prev ? { ...prev, approvalStage: 'supervisor' } : prev));
       showMessage('Case submitted for review! 🎉', true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -172,8 +132,13 @@ function Dashboard() {
         sections,
         greenLight: caseRecord?.greenLight ?? false,
         approvalStage: caseRecord?.approvalStage ?? 'pending',
-        ...(supervisor1Uid ? { supervisor1Uid, supervisor1Name } : {}),
-        ...(supervisor2Uid ? { supervisor2Uid, supervisor2Name } : {}),
+        // supervisorUid/Name are only ever stamped at case creation, from the
+        // student's Lecturer-assigned supervisor — never editable afterward
+        // (enforced in firestore.rules; the Lecturer's reassignment flow
+        // patches an existing case directly instead).
+        ...(!caseRecord && userProfile.assignedSupervisorUid
+          ? { supervisorUid: userProfile.assignedSupervisorUid, supervisorName: userProfile.assignedSupervisorName }
+          : {}),
         ...(customDeadline ? { customDeadline } : {}),
         ...(extensionReason.trim() ? { extensionReason: extensionReason.trim() } : {}),
       };
@@ -232,9 +197,8 @@ function Dashboard() {
   const stageInfo = STAGE_CONFIG[approvalStage];
 
   const currentStageApproval =
-    approvalStage === 'supervisor1' ? caseRecord?.supervisor1Approval
-    : approvalStage === 'supervisor2' ? caseRecord?.supervisor2Approval
-    : approvalStage === 'drpaul' ? caseRecord?.drpaulApproval
+    approvalStage === 'supervisor' ? caseRecord?.supervisorApproval
+    : approvalStage === 'lecturer' ? caseRecord?.lecturerApproval
     : undefined;
   const rejectionReason = !currentStageApproval?.approved ? currentStageApproval?.rejectionReason : undefined;
 
@@ -314,10 +278,8 @@ function Dashboard() {
                       {isReached || isCurrent ? '✓' : i + 1}
                     </div>
                     <p className={`text-xs mt-1 text-center leading-tight max-w-[60px] ${isCurrent ? themeConfig.headingColor : themeConfig.mutedText}`}>
-                      {step.stage === 'supervisor1' && supervisor1Name
-                        ? supervisor1Name
-                        : step.stage === 'supervisor2' && supervisor2Name
-                        ? supervisor2Name
+                      {step.stage === 'supervisor' && userProfile?.assignedSupervisorName
+                        ? userProfile.assignedSupervisorName
                         : step.label}
                     </p>
                   </div>
@@ -358,7 +320,7 @@ function Dashboard() {
             <div>
               <p className="font-bold text-emerald-800">Case Approved! 🎉</p>
               <p className="text-emerald-600 text-sm mt-0.5">
-                Dr. Paul has fully approved your case report submission.
+                Your Lecturer has fully approved your case report submission.
               </p>
             </div>
           </div>
@@ -424,37 +386,14 @@ function Dashboard() {
               </p>
             </div>
             <div className="sm:col-span-2">
-              <label className={labelClass}>Primary Supervisor (Supervisor 1)</label>
-              <select
-                value={supervisor1Uid}
-                onChange={(e) => handleSupervisor1Change(e.target.value)}
-                className={`${inputClass} ${themeConfig.selectBg}`}
-              >
-                <option value="">— Select your primary supervisor —</option>
-                {supervisorOptions.map((s) => (
-                  <option key={s.uid} value={s.uid}>{s.name}</option>
-                ))}
-              </select>
+              <label className={labelClass}>Your Supervisor</label>
+              <div className={`px-4 py-3 ${themeConfig.inputBg} border ${themeConfig.inputBorder} rounded-xl text-sm font-medium ${themeConfig.bodyText}`}>
+                {userProfile?.assignedSupervisorName ?? 'Not yet assigned'}
+              </div>
               <p className={`text-xs mt-1.5 ${themeConfig.mutedText}`}>
-                Submit your case to your primary supervisor.
-              </p>
-            </div>
-            <div className="sm:col-span-2">
-              <label className={labelClass}>Secondary Supervisor (Supervisor 2)</label>
-              <select
-                value={supervisor2Uid}
-                onChange={(e) => handleSupervisor2Change(e.target.value)}
-                className={`${inputClass} ${themeConfig.selectBg}`}
-              >
-                <option value="">— Optional: select a secondary supervisor —</option>
-                {supervisorOptions
-                  .filter((s) => s.uid !== supervisor1Uid)
-                  .map((s) => (
-                    <option key={s.uid} value={s.uid}>{s.name}</option>
-                  ))}
-              </select>
-              <p className={`text-xs mt-1.5 ${themeConfig.mutedText}`}>
-                Optional. If left blank, your primary supervisor may assign one later.
+                {userProfile?.assignedSupervisorName
+                  ? 'Assigned by your Lecturer. Contact them if this needs to change.'
+                  : 'Your Lecturer hasn’t assigned you a supervisor yet — check back before submitting for review.'}
               </p>
             </div>
           </div>
@@ -526,12 +465,14 @@ function Dashboard() {
               <div>
                 <h3 className={`font-bold ${themeConfig.headingColor}`}>Ready for Review?</h3>
                 <p className={`text-sm mt-0.5 ${themeConfig.mutedText}`}>
-                  Submit your case to your primary supervisor when you are ready for feedback.
+                  {userProfile?.assignedSupervisorName
+                    ? `Submit your case to ${userProfile.assignedSupervisorName} when you are ready for feedback.`
+                    : 'You need a supervisor assigned by your Lecturer before you can submit.'}
                 </p>
               </div>
               <button
                 onClick={handleSubmitForReview}
-                disabled={submitting}
+                disabled={submitting || !userProfile?.assignedSupervisorUid}
                 className={`${themeConfig.button} disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-xl transition-colors shadow-sm text-sm whitespace-nowrap`}
               >
                 {submitting ? 'Submitting...' : 'Submit for Review'}

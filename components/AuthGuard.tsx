@@ -16,7 +16,7 @@ interface AuthGuardProps {
 const ROLE_HOME: Record<UserRole, string> = {
   student: '/student',
   supervisor: '/supervisor',
-  drpaul: '/supervisor',
+  lecturer: '/supervisor',
 };
 
 export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {

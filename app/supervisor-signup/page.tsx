@@ -6,11 +6,16 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { BrandMark } from '@/components/Navbar';
 
+const NOT_ON_LIST = '__not_on_list__';
+
 export default function SupervisorSignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
+  // '' = not chosen yet, NOT_ON_LIST, or a staff directory entry id.
+  const [directoryChoice, setDirectoryChoice] = useState('');
+  const [staffOptions, setStaffOptions] = useState<{ id: string; name: string }[] | null>(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -24,10 +29,29 @@ export default function SupervisorSignupPage() {
     }
   }, [user, userProfile, router]);
 
+  useEffect(() => {
+    fetch('/api/staff-directory')
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('unavailable'))))
+      .then((data: { staff?: { id: string; name: string }[] }) => setStaffOptions(data.staff ?? []))
+      // If the list can't load, staff can still sign up as "not on the list".
+      .catch(() => setStaffOptions([]));
+  }, []);
+
+  const chooseDirectoryEntry = (value: string) => {
+    setDirectoryChoice(value);
+    const entry = staffOptions?.find((s) => s.id === value);
+    // Pre-fill the listed name; they can still edit it below.
+    setName(entry ? entry.name : '');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
+    if (!directoryChoice) {
+      setError('Please choose your name from the staff list, or “I’m not on this list yet”.');
+      return;
+    }
     if (!name.trim()) {
       setError('Please enter your full name.');
       return;
@@ -38,7 +62,13 @@ export default function SupervisorSignupPage() {
       const res = await fetch('/api/supervisor-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), email, password, code: code.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email,
+          password,
+          code: code.trim(),
+          ...(directoryChoice !== NOT_ON_LIST ? { directoryId: directoryChoice } : {}),
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
@@ -96,7 +126,30 @@ export default function SupervisorSignupPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="field-label" htmlFor="name">Full name</label>
+                <label className="field-label" htmlFor="directory">Are you on our staff list?</label>
+                <select
+                  id="directory"
+                  value={directoryChoice}
+                  onChange={(e) => chooseDirectoryEntry(e.target.value)}
+                  className="input"
+                  disabled={staffOptions === null}
+                  required
+                >
+                  <option value="" disabled>{staffOptions === null ? 'Loading staff list…' : 'Select your name…'}</option>
+                  {staffOptions?.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                  <option value={NOT_ON_LIST}>I’m not on this list yet</option>
+                </select>
+                <p className="text-xs text-muted mt-1.5">
+                  Students may already have chosen you as their supervisor. Picking your name links them to you.
+                </p>
+              </div>
+
+              <div>
+                <label className="field-label" htmlFor="name">
+                  {directoryChoice && directoryChoice !== NOT_ON_LIST ? 'Your name as it should appear' : 'Full name'}
+                </label>
                 <input
                   id="name"
                   type="text"
@@ -107,6 +160,9 @@ export default function SupervisorSignupPage() {
                   autoComplete="name"
                   required
                 />
+                {directoryChoice && directoryChoice !== NOT_ON_LIST && (
+                  <p className="text-xs text-muted mt-1.5">Edit this if you’d like it written differently, e.g. with your full first name.</p>
+                )}
               </div>
 
               <div>

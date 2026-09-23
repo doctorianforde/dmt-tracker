@@ -13,7 +13,8 @@ import {
   getCasesForSupervisor,
   getUsersByRole,
   getStudentsForSupervisor,
-  assignSupervisor,
+  getStaffDirectory,
+  setSupervisorChoice,
   setStudentDeadline,
   approveCase,
   rejectCase,
@@ -23,7 +24,7 @@ import {
 } from '@/lib/firestore';
 import { daysUntil, deadlineUrgency, describeDaysLeft, effectiveDeadline } from '@/lib/deadlines';
 import { ACCOUNTABILITY_WINDOW_DAYS } from '@/lib/config';
-import type { CaseRecord, ApprovalStage, UserRole, UserProfile, AccessLogEntry, AccessLogAction } from '@/types';
+import type { CaseRecord, ApprovalStage, UserRole, UserProfile, AccessLogEntry, AccessLogAction, StaffDirectoryEntry } from '@/types';
 
 // Defined once at module scope — AuthGuard's redirect effect depends on this
 // array by reference, so recreating it on every render would retrigger the
@@ -110,17 +111,17 @@ function DeadlineCell({
 
 function StudentRoster({
   students,
-  supervisors,
+  staff,
   casesByStudent,
   isLecturer,
   onAssign,
   onSetDeadline,
 }: {
   students: UserProfile[];
-  supervisors: UserProfile[];
+  staff: StaffDirectoryEntry[];
   casesByStudent: Map<string, CaseRecord>;
   isLecturer: boolean;
-  onAssign: (student: UserProfile, supervisorUid: string) => Promise<boolean>;
+  onAssign: (student: UserProfile, directoryId: string) => Promise<boolean>;
   onSetDeadline: (student: UserProfile, deadline: string | null) => Promise<boolean>;
 }) {
   const [savingUid, setSavingUid] = useState<string | null>(null);
@@ -170,21 +171,28 @@ function StudentRoster({
                   {isLecturer && (
                     <td className="px-4 py-4">
                       <select
-                        value={student.assignedSupervisorUid ?? ''}
+                        value={student.supervisorDirectoryId ?? ''}
                         disabled={savingUid === student.uid}
                         onChange={async (e) => {
                           setSavingUid(student.uid);
                           await onAssign(student, e.target.value);
                           setSavingUid(null);
                         }}
-                        className="input !py-1.5 !px-2.5 text-xs min-w-[10rem]"
+                        className="input !py-1.5 !px-2.5 text-xs min-w-[11rem]"
                         aria-label={`Supervisor for ${student.name}`}
                       >
                         <option value="">— Unassigned —</option>
-                        {supervisors.map((s) => (
-                          <option key={s.uid} value={s.uid}>{s.name}</option>
+                        {staff.map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}{s.uid ? '' : ' (not signed up yet)'}</option>
                         ))}
+                        {/* Legacy assignment made before the directory existed. */}
+                        {!student.supervisorDirectoryId && student.assignedSupervisorName && (
+                          <option value="" disabled>{student.assignedSupervisorName} (legacy)</option>
+                        )}
                       </select>
+                      {student.supervisorDirectoryId && !student.assignedSupervisorUid && (
+                        <p className="text-[11px] text-muted mt-1">Links automatically when they sign up</p>
+                      )}
                     </td>
                   )}
                   <td className="px-4 py-4">
@@ -305,7 +313,7 @@ function Dashboard() {
   const { userProfile } = useAuth();
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [students, setStudents] = useState<UserProfile[]>([]);
-  const [supervisors, setSupervisors] = useState<UserProfile[]>([]);
+  const [staff, setStaff] = useState<StaffDirectoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -336,14 +344,14 @@ function Dashboard() {
     return Promise.allSettled([
       isLecturer ? getAllCases() : getCasesForSupervisor(userProfile.uid),
       isLecturer ? getUsersByRole('student') : getStudentsForSupervisor(userProfile.uid),
-      isLecturer ? getUsersByRole('supervisor') : Promise.resolve([] as UserProfile[]),
+      isLecturer ? getStaffDirectory() : Promise.resolve([] as StaffDirectoryEntry[]),
     ] as const);
   }, [userProfile, isLecturer]);
 
   const applyResults = useCallback(
     (results: Awaited<ReturnType<typeof fetchAll>>) => {
       if (!results) return;
-      const [caseResult, studentResult, supervisorResult] = results;
+      const [caseResult, studentResult, staffResult] = results;
       const errors: string[] = [];
       if (caseResult.status === 'fulfilled') {
         const sorted = [...caseResult.value].sort((a, b) => a.studentName.localeCompare(b.studentName));
@@ -354,8 +362,8 @@ function Dashboard() {
       }
       if (studentResult.status === 'fulfilled') setStudents(studentResult.value);
       else errors.push('students: ' + errorMessage(studentResult.reason));
-      if (supervisorResult.status === 'fulfilled') setSupervisors(supervisorResult.value);
-      else errors.push('supervisors: ' + errorMessage(supervisorResult.reason));
+      if (staffResult.status === 'fulfilled') setStaff(staffResult.value);
+      else errors.push('staff list: ' + errorMessage(staffResult.reason));
 
       setLoadError(errors.length ? `Failed to load ${errors.join('; ')}` : null);
       setLastRefresh(new Date());
@@ -397,7 +405,7 @@ function Dashboard() {
           id: s.uid,
           date,
           label: s.name,
-          sublabel: isLecturer ? s.assignedSupervisorName ?? 'Unassigned' : s.caseNumber,
+          sublabel: isLecturer ? s.supervisorDirectoryName ?? s.assignedSupervisorName ?? 'Unassigned' : s.caseNumber,
           photoURL: s.photoURL || undefined,
         }];
       }),
@@ -469,14 +477,22 @@ function Dashboard() {
       log('revoke', caseNumber, caseLabel(caseNumber));
     });
 
-  const handleAssign = (student: UserProfile, supervisorUid: string) =>
+  const handleAssign = (student: UserProfile, directoryId: string) =>
     attempt(`update ${student.name}’s supervisor`, async () => {
-      const supervisor = supervisors.find((s) => s.uid === supervisorUid) ?? null;
-      await assignSupervisor(student.uid, supervisor ? { uid: supervisor.uid, name: supervisor.name } : null, student.caseNumber);
+      const entry = staff.find((s) => s.id === directoryId) ?? null;
+      await setSupervisorChoice(student.uid, entry, student.caseNumber);
+      const accountUid = entry?.uid;
+      const accountName = entry?.uid ? entry.name : undefined;
       setStudents((prev) =>
         prev.map((s) =>
           s.uid === student.uid
-            ? { ...s, assignedSupervisorUid: supervisor?.uid, assignedSupervisorName: supervisor?.name }
+            ? {
+                ...s,
+                supervisorDirectoryId: entry?.id,
+                supervisorDirectoryName: entry?.name,
+                assignedSupervisorUid: accountUid,
+                assignedSupervisorName: accountName,
+              }
             : s
         )
       );
@@ -484,12 +500,12 @@ function Dashboard() {
         setCases((prev) =>
           prev.map((c) =>
             c.caseNumber === student.caseNumber
-              ? { ...c, supervisorUid: supervisor?.uid, supervisorName: supervisor?.name }
+              ? { ...c, supervisorUid: accountUid, supervisorName: accountName }
               : c
           )
         );
       }
-      log('assign_supervisor', student.uid, `${student.name} → ${supervisor?.name ?? 'unassigned'}`);
+      log('assign_supervisor', student.uid, `${student.name} → ${entry?.name ?? 'unassigned'}`);
     });
 
   const handleSetDeadline = (student: UserProfile, deadline: string | null) =>
@@ -507,7 +523,9 @@ function Dashboard() {
     });
 
   // ── Stats ──
-  const awaitingYou = cases.filter((c) => canApprove(stageOf(c), isSupervisor, isLecturer, c)).length;
+  const awaitingYou = cases.filter((c) =>
+    canApprove(stageOf(c), { isSupervisor, isLecturer, uid: userProfile?.uid }, c)
+  ).length;
   const approvedCount = cases.filter((c) => stageOf(c) === 'approved').length;
   const dueSoon = Object.values(deadlines).filter((d) => {
     if (!d) return false;
@@ -591,7 +609,7 @@ function Dashboard() {
                 title="Case reviews"
                 description={
                   isLecturer
-                    ? 'Grant final approval once the assigned supervisor has approved.'
+                    ? 'Grant final approval once the supervisor has approved. Students who chose you as their supervisor also appear here for the first review.'
                     : 'Approve to send a case on to the Lecturer, or request changes.'
                 }
               />
@@ -599,6 +617,7 @@ function Dashboard() {
                 cases={cases}
                 isLecturer={isLecturer}
                 isSupervisor={isSupervisor}
+                currentUid={userProfile?.uid}
                 deadlines={deadlines}
                 onApprove={handleApprove}
                 onReject={handleReject}
@@ -634,7 +653,7 @@ function Dashboard() {
               />
               <StudentRoster
                 students={students}
-                supervisors={supervisors}
+                staff={staff}
                 casesByStudent={casesByStudent}
                 isLecturer={isLecturer}
                 onAssign={handleAssign}

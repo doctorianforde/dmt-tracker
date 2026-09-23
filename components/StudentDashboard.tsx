@@ -17,8 +17,10 @@ import {
   submitCaseForReview,
   resubmitCase,
   updateUserProfile,
+  getStaffDirectory,
+  setSupervisorChoice,
 } from '@/lib/firestore';
-import type { CaseRecord, CaseSections, ApprovalStage, UserRole } from '@/types';
+import type { CaseRecord, CaseSections, ApprovalStage, UserRole, StaffDirectoryEntry } from '@/types';
 import { START_YEAR_MIN, START_YEAR_MAX, CLASS_YEARS, ACCOUNTABILITY_WINDOW_DAYS } from '@/lib/config';
 import { daysUntil, effectiveDeadline } from '@/lib/deadlines';
 
@@ -92,11 +94,21 @@ function Dashboard() {
   const [extensionReason, setExtensionReason] = useState('');
   const [showExtension, setShowExtension] = useState(false);
 
+  const [staff, setStaff] = useState<StaffDirectoryEntry[]>([]);
+  const [staffError, setStaffError] = useState<string | null>(null);
+  const [savingSupervisor, setSavingSupervisor] = useState(false);
+
   const uid = user?.uid;
   const profileCaseNumber = userProfile?.caseNumber;
   const profileStartYear = userProfile?.startYear;
   const profileClassYear = userProfile?.classYear;
   const isProfileSetup = !!profileCaseNumber;
+
+  useEffect(() => {
+    getStaffDirectory()
+      .then(setStaff)
+      .catch((err: unknown) => setStaffError('Couldn’t load the staff list: ' + (err instanceof Error ? err.message : 'Unknown error')));
+  }, []);
 
   // Keyed on the fields that define the form (not the whole profile object),
   // so e.g. uploading a photo doesn't reset unsaved edits.
@@ -154,10 +166,10 @@ function Dashboard() {
         sections,
         greenLight: caseRecord?.greenLight ?? false,
         approvalStage: caseRecord?.approvalStage ?? 'pending',
-        // supervisorUid/Name are only ever stamped at case creation, from the
-        // student's Lecturer-assigned supervisor — never editable afterward
-        // (enforced in firestore.rules; the Lecturer's reassignment flow
-        // patches an existing case directly instead).
+        // supervisorUid/Name are stamped at case creation from the student's
+        // profile; later changes go through setSupervisorChoice, which keeps
+        // the case in sync (and firestore.rules only allows it while the
+        // case is a draft).
         ...(!caseRecord && userProfile.assignedSupervisorUid
           ? { supervisorUid: userProfile.assignedSupervisorUid, supervisorName: userProfile.assignedSupervisorName }
           : {}),
@@ -181,6 +193,24 @@ function Dashboard() {
 
   const handleSave = async () => {
     if (await persist()) showMessage('Progress saved', true);
+  };
+
+  const handleSupervisorChange = async (directoryId: string) => {
+    if (!user) return;
+    const entry = staff.find((s) => s.id === directoryId) ?? null;
+    setSavingSupervisor(true);
+    try {
+      await setSupervisorChoice(user.uid, entry, profileCaseNumber);
+      setCaseRecord((prev) =>
+        prev ? { ...prev, supervisorUid: entry?.uid, supervisorName: entry?.uid ? entry.name : undefined } : prev
+      );
+      await refreshProfile();
+      showMessage(entry ? `Supervisor set to ${entry.name}` : 'Supervisor cleared', true);
+    } catch (err: unknown) {
+      showMessage('Couldn’t update your supervisor: ' + (err instanceof Error ? err.message : 'Unknown error'), false);
+    } finally {
+      setSavingSupervisor(false);
+    }
   };
 
   const handleSubmitForReview = async () => {
@@ -256,6 +286,11 @@ function Dashboard() {
     !!rejectionReason && !!caseRecord?.resubmittedAt &&
     (!rejectedAt || caseRecord.resubmittedAt.getTime() > rejectedAt.getTime());
 
+  const supervisorName = userProfile?.supervisorDirectoryName ?? userProfile?.assignedSupervisorName;
+  const hasSupervisor = !!(userProfile?.supervisorDirectoryId || userProfile?.assignedSupervisorUid);
+  const supervisorSignedUp = !!userProfile?.assignedSupervisorUid;
+  const supervisorLocked = approvalStage !== 'pending';
+
   const deadline = effectiveDeadline(userProfile, caseRecord);
   const daysLeft = deadline ? daysUntil(deadline) : Infinity;
   const deadlineClose = daysLeft <= ACCOUNTABILITY_WINDOW_DAYS;
@@ -304,12 +339,35 @@ function Dashboard() {
           </select>
         </div>
         <div className="sm:col-span-2">
-          <p className="field-label">Supervisor</p>
-          <p className="text-sm font-semibold text-ink">{userProfile?.assignedSupervisorName ?? 'Not yet assigned'}</p>
-          <p className="text-xs text-muted mt-1">
-            {userProfile?.assignedSupervisorName
-              ? 'Assigned by your Lecturer. Contact them if this needs to change.'
-              : 'Your Lecturer hasn’t assigned you a supervisor yet — check back before submitting for review.'}
+          <label className="field-label" htmlFor="supervisor">Your supervisor</label>
+          <select
+            id="supervisor"
+            value={userProfile?.supervisorDirectoryId ?? ''}
+            onChange={(e) => handleSupervisorChange(e.target.value)}
+            disabled={supervisorLocked || savingSupervisor}
+            className="input"
+          >
+            <option value="">— Choose your supervisor —</option>
+            {staff.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+            {/* Assigned before the staff list existed. */}
+            {!userProfile?.supervisorDirectoryId && userProfile?.assignedSupervisorName && (
+              <option value="" disabled>{userProfile.assignedSupervisorName}</option>
+            )}
+          </select>
+          <p className="text-xs text-muted mt-1.5">
+            {staffError
+              ? staffError
+              : savingSupervisor
+              ? 'Saving…'
+              : supervisorLocked
+              ? 'Locked because your case has been submitted. Ask your Lecturer if it needs to change.'
+              : hasSupervisor && !supervisorSignedUp
+              ? `${supervisorName} hasn’t joined VIS yet. You’ll be linked automatically when they sign up.`
+              : hasSupervisor
+              ? 'You can change this until you submit your case for review.'
+              : 'Pick your supervisor from the list, even if they haven’t joined VIS yet.'}
           </p>
         </div>
       </div>
@@ -462,9 +520,7 @@ function Dashboard() {
                       {reached ? '✓' : i + 1}
                     </span>
                     <span className={`text-xs sm:text-sm mt-2 font-semibold ${current ? 'text-ink' : 'text-muted'}`}>
-                      {step.stage === 'supervisor' && userProfile?.assignedSupervisorName
-                        ? userProfile.assignedSupervisorName
-                        : step.label}
+                      {step.stage === 'supervisor' && supervisorName ? supervisorName : step.label}
                     </span>
                   </li>
                 );
@@ -476,14 +532,16 @@ function Dashboard() {
                 <div>
                   <p className="font-bold text-ink">Ready for review?</p>
                   <p className="text-sm text-muted mt-0.5">
-                    {userProfile?.assignedSupervisorName
-                      ? `Send your case to ${userProfile.assignedSupervisorName} when you’re ready for feedback.`
-                      : 'You need a supervisor assigned by your Lecturer before you can submit.'}
+                    {!hasSupervisor
+                      ? 'Choose your supervisor in your profile below before you submit.'
+                      : supervisorSignedUp
+                      ? `Send your case to ${supervisorName} when you’re ready for feedback.`
+                      : `${supervisorName} hasn’t joined VIS yet — your case will be waiting for them when they sign up.`}
                   </p>
                 </div>
                 <button
                   onClick={handleSubmitForReview}
-                  disabled={submitting || saving || !userProfile?.assignedSupervisorUid}
+                  disabled={submitting || saving || !hasSupervisor}
                   className="btn-primary whitespace-nowrap"
                 >
                   {submitting ? 'Submitting…' : 'Submit for review →'}

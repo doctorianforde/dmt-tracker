@@ -18,10 +18,6 @@ service cloud.firestore {
       return isAuthed() && userDoc().role == 'lecturer';
     }
 
-    function isStaff() {
-      return isAuthed() && userDoc().role in ['supervisor', 'lecturer'];
-    }
-
     function isStudent() {
       return isAuthed() && userDoc().role == 'student';
     }
@@ -30,7 +26,7 @@ service cloud.firestore {
     match /users/{userId} {
       // Fields only staff may set on a student's profile.
       function assignmentFields() {
-        return ['assignedSupervisorUid', 'assignedSupervisorName'];
+        return ['supervisorDirectoryId', 'supervisorDirectoryName', 'assignedSupervisorUid', 'assignedSupervisorName'];
       }
       function deadlineFields() {
         return ['deadline', 'deadlineSetByName'];
@@ -42,6 +38,32 @@ service cloud.firestore {
         return !('photoURL' in request.resource.data)
           || (request.resource.data.photoURL is string
               && request.resource.data.photoURL.size() < 200000);
+      }
+
+      // A student may pick their own supervisor from the staff directory, but
+      // only while their case is still a draft (not yet submitted).
+      function caseIsDraft(caseNumber) {
+        return !exists(/databases/$(database)/documents/cases/$(caseNumber))
+          || get(/databases/$(database)/documents/cases/$(caseNumber)).data.get('approvalStage', 'pending') == 'pending';
+      }
+      function studentCanChangeSupervisor() {
+        return resource.data.role == 'student'
+          && (resource.data.get('caseNumber', '') == '' || caseIsDraft(resource.data.caseNumber));
+      }
+
+      // The pick must be a real directory entry, copied faithfully: its name,
+      // plus its account uid/name only if that person has signed up.
+      function staffChoiceMatches(d, entry) {
+        return d.get('supervisorDirectoryName', null) == entry.name
+          && d.get('assignedSupervisorUid', null) == entry.get('uid', null)
+          && d.get('assignedSupervisorName', null) == ('uid' in entry ? entry.name : null);
+      }
+
+      function supervisorChoiceValid() {
+        let d = request.resource.data;
+        return !('supervisorDirectoryId' in d)
+          ? !d.keys().hasAny(['supervisorDirectoryName', 'assignedSupervisorUid', 'assignedSupervisorName'])
+          : staffChoiceMatches(d, get(/databases/$(database)/documents/staff/$(d.supervisorDirectoryId)).data);
       }
 
       function isAssignedSupervisorOf() {
@@ -63,14 +85,17 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(assignmentFields().concat(deadlineFields()))
         && photoOk();
 
-      // Users can update their own profile but cannot change their role,
-      // self-assign a supervisor or move their own deadline. The Lecturer may
-      // update the assignment and deadline fields on any profile; a
-      // Supervisor only the deadline of a student assigned to them.
+      // Users can update their own profile but cannot change their role or
+      // move their own deadline; students may pick their supervisor (see
+      // above). The Lecturer may update the assignment and deadline fields on
+      // any profile; a Supervisor only the deadline of a student assigned to
+      // them.
       allow update: if
         (request.auth.uid == userId
           && !request.resource.data.diff(resource.data).affectedKeys()
-               .hasAny(['role'].concat(assignmentFields()).concat(deadlineFields()))
+               .hasAny(['role'].concat(deadlineFields()))
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(assignmentFields())
+              || (studentCanChangeSupervisor() && supervisorChoiceValid()))
           && photoOk())
         || (isLecturer()
           && request.resource.data.diff(resource.data).affectedKeys()
@@ -106,7 +131,17 @@ service cloud.firestore {
       // legacy student-set deadline; deadlines are now set by staff on the
       // student's profile, so it's frozen here.
       function protectedCaseFields() {
-        return ['greenLight', 'supervisorApproval', 'lecturerApproval', 'supervisorUid', 'supervisorName', 'customDeadline'];
+        return ['greenLight', 'supervisorApproval', 'lecturerApproval', 'customDeadline'];
+      }
+
+      // Students may copy their own profile's supervisor onto their case,
+      // only while it's still a draft.
+      function studentSupervisorSyncOk() {
+        let affected = request.resource.data.diff(resource.data).affectedKeys();
+        return !affected.hasAny(['supervisorUid', 'supervisorName'])
+          || (resource.data.get('approvalStage', 'pending') == 'pending'
+              && request.resource.data.get('supervisorUid', null) == userDoc().get('assignedSupervisorUid', null)
+              && request.resource.data.get('supervisorName', null) == userDoc().get('assignedSupervisorName', null));
       }
 
       function studentCanUpdateCase() {
@@ -114,6 +149,7 @@ service cloud.firestore {
         // Students may submit their case (pending -> supervisor) but cannot change other stages,
         // and can never touch the protected fields above.
         return !affected.hasAny(protectedCaseFields())
+          && studentSupervisorSyncOk()
           && (!affected.hasAny(['approvalStage'])
               || (resource.data.approvalStage == 'pending'
                   && request.resource.data.approvalStage == 'supervisor'));
@@ -132,10 +168,20 @@ service cloud.firestore {
                .hasOnly(['approvalStage', 'supervisorApproval', 'updatedAt']))
         ||
         // The Lecturer can give/revoke final green light, record final approval,
-        // and reassign a case to a different supervisor.
+        // reassign a case to a different supervisor, and — when a student has
+        // picked them as their supervisor — record the supervisor approval.
         (isLecturer()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['greenLight', 'approvalStage', 'lecturerApproval', 'supervisorUid', 'supervisorName', 'updatedAt']));
+               .hasOnly(['greenLight', 'approvalStage', 'lecturerApproval', 'supervisorApproval', 'supervisorUid', 'supervisorName', 'updatedAt']));
+    }
+
+    // ── Staff directory ──────────────────────────────────────────────────────
+    match /staff/{entryId} {
+      // Any signed-in user can see the directory (students pick their
+      // supervisor from it). Only the server writes to it: entries are seeded
+      // by scripts/seed-staff-directory.mjs and claimed at staff sign-up.
+      allow read: if isAuthed();
+      allow write: if false;
     }
 
     // ── Access Log ───────────────────────────────────────────────────────────

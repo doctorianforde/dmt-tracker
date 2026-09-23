@@ -1,22 +1,36 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const createUser = vi.fn();
+const deleteUser = vi.fn();
 const docSet = vi.fn();
+const docDelete = vi.fn();
+const assertStaffEntryClaimable = vi.fn();
+const claimStaffEntry = vi.fn();
 
 vi.mock('@/lib/firebase-admin', () => ({
-  getAdminAuth: () => ({ createUser }),
+  getAdminAuth: () => ({ createUser, deleteUser }),
   getAdminDb: () => ({
     collection: () => ({
-      doc: () => ({ set: docSet }),
+      doc: () => ({ set: docSet, delete: docDelete }),
     }),
   }),
 }));
+
+vi.mock('@/lib/staff-directory-server', () => {
+  class StaffEntryUnavailableError extends Error {}
+  return {
+    StaffEntryUnavailableError,
+    assertStaffEntryClaimable: (...args: unknown[]) => assertStaffEntryClaimable(...args),
+    claimStaffEntry: (...args: unknown[]) => claimStaffEntry(...args),
+  };
+});
 
 vi.mock('firebase-admin/firestore', () => ({
   FieldValue: { serverTimestamp: () => 'MOCK_TIMESTAMP' },
 }));
 
 import { POST } from '@/app/api/supervisor-signup/route';
+import { StaffEntryUnavailableError } from '@/lib/staff-directory-server';
 
 function makeRequest(body: unknown) {
   return new Request('http://localhost/api/supervisor-signup', {
@@ -112,5 +126,54 @@ describe('POST /api/supervisor-signup', () => {
     const res = await POST(makeRequest({ name: 'Dr. Jane', email: 'jane@test.edu', password: 'secret1', code: 'correct-code' }));
     expect(res.status).toBe(403);
     expect(createUser).not.toHaveBeenCalled();
+  });
+
+  describe('staff directory', () => {
+    const body = { name: 'Dr. Aisha Khan', email: 'khan@test.edu', password: 'secret1', code: 'correct-code' };
+
+    it('claims the chosen directory entry, keeping the edited name', async () => {
+      createUser.mockResolvedValue({ uid: 'uid-khan' });
+
+      const res = await POST(makeRequest({ ...body, directoryId: 'entry-khan' }));
+
+      expect(res.status).toBe(200);
+      expect(assertStaffEntryClaimable).toHaveBeenCalledWith(expect.anything(), 'entry-khan');
+      expect(claimStaffEntry).toHaveBeenCalledWith(expect.anything(), {
+        directoryId: 'entry-khan',
+        uid: 'uid-khan',
+        name: 'Dr. Aisha Khan',
+        role: 'supervisor',
+      });
+    });
+
+    it('adds a new directory entry for someone not on the list', async () => {
+      createUser.mockResolvedValue({ uid: 'uid-new' });
+
+      const res = await POST(makeRequest(body));
+
+      expect(res.status).toBe(200);
+      expect(assertStaffEntryClaimable).not.toHaveBeenCalled();
+      expect(claimStaffEntry).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ directoryId: undefined, uid: 'uid-new' }));
+    });
+
+    it('refuses an already-claimed name before creating any account', async () => {
+      assertStaffEntryClaimable.mockRejectedValueOnce(new StaffEntryUnavailableError('taken'));
+
+      const res = await POST(makeRequest({ ...body, directoryId: 'entry-khan' }));
+
+      expect(res.status).toBe(409);
+      expect(createUser).not.toHaveBeenCalled();
+    });
+
+    it('rolls back the new account if the name is claimed mid-signup', async () => {
+      createUser.mockResolvedValue({ uid: 'uid-late' });
+      claimStaffEntry.mockRejectedValueOnce(new StaffEntryUnavailableError('taken'));
+
+      const res = await POST(makeRequest({ ...body, directoryId: 'entry-khan' }));
+
+      expect(res.status).toBe(409);
+      expect(docDelete).toHaveBeenCalled();
+      expect(deleteUser).toHaveBeenCalledWith('uid-late');
+    });
   });
 });

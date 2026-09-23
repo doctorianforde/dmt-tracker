@@ -29,7 +29,12 @@ export interface UserProfile {
   startYear?: number;
   classYear?: number;
   theme?: ThemeChoice;
-  // Set only by the Lecturer, via the "Manage Students" panel.
+  // The student's supervisor, picked from the staff directory — by the
+  // student themselves (until they submit) or by the Lecturer. The directory
+  // entry may belong to someone who hasn't signed up yet; assignedSupervisor*
+  // is filled in once they do (see lib/staff-directory-server.ts).
+  supervisorDirectoryId?: string;
+  supervisorDirectoryName?: string;
   assignedSupervisorUid?: string;
   assignedSupervisorName?: string;
   // Submission deadline (YYYY-MM-DD). Set only by the Lecturer or the
@@ -38,6 +43,15 @@ export interface UserProfile {
   deadlineSetByName?: string;
   // Small square JPEG as a data URL (resized client-side, ~10–20 KB).
   photoURL?: string;
+}
+
+// An entry in the staff directory (Firestore `staff` collection). Seeded with
+// the known supervisors; claimed when that person signs up.
+export interface StaffDirectoryEntry {
+  id: string;
+  name: string;
+  uid?: string; // set once claimed by a signed-up staff account
+  role?: UserRole;
 }
 
 export interface CaseSections {

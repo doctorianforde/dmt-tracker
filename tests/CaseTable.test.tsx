@@ -42,6 +42,22 @@ describe('CaseTable approval routing', () => {
     expect(screen.getByText('Waiting for approval')).toBeInTheDocument();
   });
 
+  it('lets a Lecturer who is the student’s chosen supervisor do the supervisor review', () => {
+    const rec = makeCase({ approvalStage: 'supervisor', supervisorUid: 'lect-1', supervisorApproval: { approved: false } });
+    const onApprove = vi.fn();
+    render(<CaseTable cases={[rec]} isLecturer currentUid="lect-1" onApprove={onApprove} />);
+
+    fireEvent.click(screen.getByText('✅ Approve & Send to Lecturer'));
+    expect(onApprove).toHaveBeenCalledWith('DMT-2024-001', 'supervisor', 'lecturer');
+  });
+
+  it('does not let a Lecturer do the supervisor review for someone else’s student', () => {
+    const rec = makeCase({ approvalStage: 'supervisor', supervisorUid: 'sup-1', supervisorApproval: { approved: false } });
+    render(<CaseTable cases={[rec]} isLecturer currentUid="lect-1" />);
+
+    expect(screen.queryByText('✅ Approve & Send to Lecturer')).not.toBeInTheDocument();
+  });
+
   it('lets the assigned supervisor approve and advance to the Lecturer stage', () => {
     const rec = makeCase({ approvalStage: 'supervisor', supervisorApproval: { approved: false } });
     render(<CaseTable cases={[rec]} isSupervisor />);

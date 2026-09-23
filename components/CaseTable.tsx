@@ -13,6 +13,9 @@ interface Props {
   cases: CaseRecord[];
   isLecturer?: boolean;
   isSupervisor?: boolean;
+  // The signed-in reviewer's uid. Lets a Lecturer who is also a student's
+  // chosen supervisor review at the supervisor stage.
+  currentUid?: string;
   // Effective deadline per studentUid, for the Deadline column.
   deadlines?: Record<string, string | undefined>;
   onApprove?: (caseNumber: string, role: 'supervisor' | 'lecturer', nextStage: ApprovalStage) => ActionResult;
@@ -20,8 +23,10 @@ interface Props {
   onRevoke?: (caseNumber: string) => ActionResult;
 }
 
-function reviewerRole(isLecturer: boolean): 'supervisor' | 'lecturer' {
-  return isLecturer ? 'lecturer' : 'supervisor';
+// Who is acting depends on the stage being reviewed, not on the viewer's
+// account role (a Lecturer can also be a student's supervisor).
+function reviewerRole(stage: ApprovalStage): 'supervisor' | 'lecturer' {
+  return stage === 'supervisor' ? 'supervisor' : 'lecturer';
 }
 
 function currentStageApproval(record: CaseRecord, stage: ApprovalStage) {
@@ -54,29 +59,32 @@ export const STAGE_STYLES: Record<ApprovalStage, { label: string; pill: string; 
   approved: { label: 'Approved', pill: 'bg-ok/15 text-ok', dot: 'bg-ok' },
 };
 
-function getNextStage(
-  current: ApprovalStage,
-  isSupervisor: boolean,
-  isLecturer: boolean,
-  record: CaseRecord
-): ApprovalStage | null {
-  if (isSupervisor && current === 'supervisor' && !record.supervisorApproval?.approved) {
+interface Viewer {
+  isSupervisor: boolean;
+  isLecturer: boolean;
+  uid?: string;
+}
+
+// Supervisors only ever load their own students' cases (enforced in
+// firestore.rules); a Lecturer acts at the supervisor stage only on cases
+// where they are the assigned supervisor.
+function actsAsSupervisor(viewer: Viewer, record: CaseRecord): boolean {
+  return viewer.isSupervisor || (!!viewer.uid && record.supervisorUid === viewer.uid);
+}
+
+function getNextStage(current: ApprovalStage, viewer: Viewer, record: CaseRecord): ApprovalStage | null {
+  if (current === 'supervisor' && actsAsSupervisor(viewer, record) && !record.supervisorApproval?.approved) {
     return 'lecturer';
   }
-  if (isLecturer && current === 'lecturer' && record.supervisorApproval?.approved) {
+  if (viewer.isLecturer && current === 'lecturer' && record.supervisorApproval?.approved) {
     return 'approved';
   }
   return null;
 }
 
-export function canApprove(
-  stage: ApprovalStage,
-  isSupervisor: boolean,
-  isLecturer: boolean,
-  record: CaseRecord
-): boolean {
-  if (isSupervisor && stage === 'supervisor' && !record.supervisorApproval?.approved) return true;
-  if (isLecturer && stage === 'lecturer' && !record.lecturerApproval?.approved && record.supervisorApproval?.approved) return true;
+export function canApprove(stage: ApprovalStage, viewer: Viewer, record: CaseRecord): boolean {
+  if (stage === 'supervisor' && actsAsSupervisor(viewer, record) && !record.supervisorApproval?.approved) return true;
+  if (viewer.isLecturer && stage === 'lecturer' && !record.lecturerApproval?.approved && record.supervisorApproval?.approved) return true;
   return false;
 }
 
@@ -90,7 +98,7 @@ function getStageButtonLabel(next: ApprovalStage): string {
   return 'Advance';
 }
 
-export default function CaseTable({ cases, isLecturer = false, isSupervisor = false, deadlines, onApprove, onReject, onRevoke }: Props) {
+export default function CaseTable({ cases, isLecturer = false, isSupervisor = false, currentUid, deadlines, onApprove, onReject, onRevoke }: Props) {
   const [search, setSearch] = useState('');
   const [rejectingCase, setRejectingCase] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -118,7 +126,7 @@ export default function CaseTable({ cases, isLecturer = false, isSupervisor = fa
 
   const confirmReject = async (record: CaseRecord) => {
     if (!rejectReason.trim()) return;
-    const role = reviewerRole(isLecturer);
+    const role = reviewerRole(stageOf(record));
     const reason = rejectReason.trim();
     const ok = await run(record.caseNumber, () => onReject?.(record.caseNumber, role, reason));
     if (ok) cancelReject();
@@ -181,8 +189,9 @@ export default function CaseTable({ cases, isLecturer = false, isSupervisor = fa
               const completedCount = SECTION_KEYS.filter((k) => rec.sections?.[k]).length;
               const stage = stageOf(rec);
               const stageStyle = STAGE_STYLES[stage];
-              const nextStage = getNextStage(stage, isSupervisor, isLecturer, rec);
-              const canApproveCase = canApprove(stage, isSupervisor, isLecturer, rec);
+              const viewer = { isSupervisor, isLecturer, uid: currentUid };
+              const nextStage = getNextStage(stage, viewer, rec);
+              const canApproveCase = canApprove(stage, viewer, rec);
               const busy = busyCase === rec.caseNumber;
               const approval = currentStageApproval(rec, stage);
               const resubmitted = isResubmitted(rec, stage);
@@ -250,7 +259,7 @@ export default function CaseTable({ cases, isLecturer = false, isSupervisor = fa
                         {canApproveCase && nextStage && rejectingCase !== rec.caseNumber && (
                           <div className="flex flex-col items-center gap-1">
                             <button
-                              onClick={() => run(rec.caseNumber, () => onApprove?.(rec.caseNumber, reviewerRole(isLecturer), nextStage))}
+                              onClick={() => run(rec.caseNumber, () => onApprove?.(rec.caseNumber, reviewerRole(stage), nextStage))}
                               disabled={busy}
                               className="btn !px-3 !py-1.5 text-xs bg-ok/15 text-ok hover:bg-ok/25 whitespace-nowrap"
                             >

@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
+import {
+  assertStaffEntryClaimable,
+  claimStaffEntry,
+  StaffEntryUnavailableError,
+} from '@/lib/staff-directory-server';
 import type { UserRole } from '@/types';
 
 interface SupervisorSignupBody {
@@ -8,6 +13,9 @@ interface SupervisorSignupBody {
   email?: string;
   password?: string;
   code?: string;
+  // The staff-directory entry they say they are; omitted for "I'm not on
+  // this list yet".
+  directoryId?: string;
 }
 
 // The submitted invite code determines the role — the client never gets to
@@ -33,6 +41,7 @@ export async function POST(request: Request) {
   const email = body?.email?.trim();
   const password = body?.password;
   const submittedCode = body?.code?.trim() ?? '';
+  const directoryId = body?.directoryId?.trim() || undefined;
 
   const role = roleForInviteCode(submittedCode);
   if (!role) {
@@ -45,19 +54,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
   }
 
+  let createdUid: string | null = null;
   try {
     const auth = getAdminAuth();
-    const userRecord = await auth.createUser({ email, password, displayName: name });
+    const db = getAdminDb();
+    if (directoryId) await assertStaffEntryClaimable(db, directoryId);
 
-    await getAdminDb().collection('users').doc(userRecord.uid).set({
+    const userRecord = await auth.createUser({ email, password, displayName: name });
+    createdUid = userRecord.uid;
+
+    await db.collection('users').doc(userRecord.uid).set({
       name,
       email,
       role,
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    await claimStaffEntry(db, { directoryId, uid: userRecord.uid, name, role });
+
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
+    if (err instanceof StaffEntryUnavailableError) {
+      // Lost a race for the same name after the account was created — undo it.
+      if (createdUid) await rollbackAccount(createdUid);
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
     const errorCode = (err as { code?: string })?.code;
     if (errorCode === 'auth/email-already-exists') {
       return NextResponse.json({ error: 'An account with this email already exists. Try signing in.' }, { status: 409 });
@@ -67,5 +88,14 @@ export async function POST(request: Request) {
     }
     const message = err instanceof Error ? err.message : 'Sign-up failed';
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+async function rollbackAccount(uid: string) {
+  try {
+    await getAdminDb().collection('users').doc(uid).delete();
+    await getAdminAuth().deleteUser(uid);
+  } catch (err) {
+    console.error('Failed to roll back account', uid, err);
   }
 }

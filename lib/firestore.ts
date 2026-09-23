@@ -22,6 +22,7 @@ import type {
   SupervisorApproval,
   UserRole,
   AccessLogEntry,
+  StaffDirectoryEntry,
 } from '@/types';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -100,28 +101,48 @@ export async function getStudentsForSupervisor(supervisorUid: string): Promise<U
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// Lecturer-only: assign, reassign or unassign (supervisor = null) a student's
-// supervisor. Keeps the case record's denormalized supervisorUid/Name in sync
-// if the student already has a case on file.
-export async function assignSupervisor(
+// ── Staff directory ───────────────────────────────────────────────────────
+
+// Everyone in the staff directory, signed up or not. Written server-side only.
+export async function getStaffDirectory(): Promise<StaffDirectoryEntry[]> {
+  const db = getSafeDb();
+  const snap = await getDocs(collection(db, 'staff'));
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() } as StaffDirectoryEntry))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Sets (or clears, with null) a student's supervisor from the staff
+// directory. Used by the student themselves (only while their case is still a
+// draft — enforced in firestore.rules) and by the Lecturer (any time). If the
+// chosen person hasn't signed up yet, only the directory pick is stored; the
+// sign-up route fills in assignedSupervisor* when they join. Keeps the case
+// record's denormalized supervisorUid/Name in sync if a case exists.
+export async function setSupervisorChoice(
   studentUid: string,
-  supervisor: { uid: string; name: string } | null,
+  entry: StaffDirectoryEntry | null,
   caseNumber?: string
 ): Promise<void> {
   const db = getSafeDb();
-  const fields = supervisor
-    ? { uid: supervisor.uid, name: supervisor.name }
-    : { uid: deleteField(), name: deleteField() };
+  const accountUid = entry?.uid ?? null;
+  const accountName = entry?.uid ? entry.name : null;
+
   await updateDoc(doc(db, 'users', studentUid), {
-    assignedSupervisorUid: fields.uid,
-    assignedSupervisorName: fields.name,
+    supervisorDirectoryId: entry?.id ?? deleteField(),
+    supervisorDirectoryName: entry?.name ?? deleteField(),
+    assignedSupervisorUid: accountUid ?? deleteField(),
+    assignedSupervisorName: accountName ?? deleteField(),
   });
+
   if (caseNumber) {
-    await updateDoc(doc(db, 'cases', caseNumber), {
-      supervisorUid: fields.uid,
-      supervisorName: fields.name,
-      updatedAt: serverTimestamp(),
-    });
+    const caseRef = doc(db, 'cases', caseNumber);
+    if ((await getDoc(caseRef)).exists()) {
+      await updateDoc(caseRef, {
+        supervisorUid: accountUid ?? deleteField(),
+        supervisorName: accountName ?? deleteField(),
+        updatedAt: serverTimestamp(),
+      });
+    }
   }
 }
 

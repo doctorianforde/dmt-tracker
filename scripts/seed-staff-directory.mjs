@@ -19,6 +19,7 @@ const STAFF = [
   'Dr. Sammy',
   'Dr. Babwahsingh',
   'Dr. R. Bacchus',
+  'Dr. Davin Powdhar',
 ];
 
 const { FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, FIREBASE_ADMIN_PRIVATE_KEY } = process.env;

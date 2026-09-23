@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
+import { BrandMark } from '@/components/Navbar';
 
 export default function SupervisorSignupPage() {
   const [name, setName] = useState('');
@@ -55,164 +56,129 @@ export default function SupervisorSignupPage() {
 
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-violet-700 via-violet-800 to-slate-900 flex-col justify-between p-12">
+    <div className="min-h-screen grid lg:grid-cols-[1.1fr_1fr]">
+      <section className="hidden lg:flex flex-col justify-between p-12 xl:p-16">
+        <BrandMark className="text-on-canvas" />
+
         <div>
-          <div className="flex items-center gap-3 mb-14">
-            <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center">
-              <span className="text-white text-sm font-bold">VIS</span>
-            </div>
-            <span className="text-white/90 font-semibold text-lg">VIS</span>
-          </div>
-
-          <h2 className="text-4xl font-bold text-white leading-tight mb-5">
-            Staff
-            <br />
-            Account
-            <br />
-            <span className="text-violet-300">Setup</span>
+          <p className="eyebrow text-on-canvas-muted">Staff accounts</p>
+          <h2 className="display text-6xl xl:text-7xl leading-[0.92] text-on-canvas on-canvas-text mt-4 max-w-xl">
+            Guide every case to the finish line.
           </h2>
-          <p className="text-violet-200 text-base leading-relaxed max-w-sm">
-            Register your account using the invite code provided by your administrator.
-            Your role — supervisor or lecturer — is set automatically based on which code you enter.
-          </p>
+          <ol className="mt-12 space-y-4 max-w-md">
+            {[
+              'Review your assigned students’ case records',
+              'Set each student’s submission deadline',
+              'See every deadline on one calendar',
+              'Lecturers give final approval',
+            ].map((text, i) => (
+              <li key={text} className="flex items-baseline gap-4 border-t border-on-canvas/15 pt-4">
+                <span className="display text-2xl text-accent on-canvas-text tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+                <span className="text-on-canvas text-base">{text}</span>
+              </li>
+            ))}
+          </ol>
         </div>
 
-        <div className="space-y-3">
-          {[
-            { icon: '👁️', text: 'View your assigned students’ case records' },
-            { icon: '📊', text: 'Track progress across your cohort' },
-            { icon: '✅', text: 'Lecturers can issue Green Light approvals' },
-          ].map(({ icon, text }) => (
-            <div key={text} className="flex items-center gap-3 text-violet-100/80">
-              <span>{icon}</span>
-              <span className="text-sm">{text}</span>
-            </div>
-          ))}
-          <p className="text-violet-300/60 text-xs pt-2">
-            Student accounts use the main sign-up page
-          </p>
-        </div>
-      </div>
+        <p className="text-sm text-on-canvas-muted max-w-md">
+          Your role, supervisor or lecturer, is set by the invite code you enter.
+        </p>
+      </section>
 
-      {/* Right panel — form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 bg-slate-50">
+      <section className="flex items-center justify-center p-5 sm:p-10">
         <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xs font-bold">VIS</span>
-            </div>
-            <span className="font-semibold text-slate-800">VIS</span>
-          </div>
+          <BrandMark className="text-on-canvas mb-8 lg:hidden" />
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-            <div className="mb-7">
-              <h1 className="text-2xl font-bold text-slate-900">Staff sign up</h1>
-              <p className="text-slate-500 text-sm mt-1">
-                You need an invite code for your role
-              </p>
-            </div>
+          <div className="card p-7 sm:p-9">
+            <p className="eyebrow text-muted">Supervisors & lecturers</p>
+            <h1 className="display text-4xl text-ink mt-2">Staff sign up</h1>
+            <p className="text-muted text-sm mt-2 mb-7">You need an invite code for your role.</p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Name */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                  Full Name
-                </label>
+                <label className="field-label" htmlFor="name">Full name</label>
                 <input
+                  id="name"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Dr. Jane Smith"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                  className="input"
+                  autoComplete="name"
                   required
                 />
               </div>
 
-              {/* Email */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                  Email Address
-                </label>
+                <label className="field-label" htmlFor="email">Email address</label>
                 <input
+                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@university.edu"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                  className="input"
+                  autoComplete="email"
                   required
                 />
               </div>
 
-              {/* Password */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                  Password
-                </label>
+                <label className="field-label" htmlFor="password">Password</label>
                 <input
+                  id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                  className="input"
+                  autoComplete="new-password"
                   required
                   minLength={6}
                 />
               </div>
 
-              {/* Invite code */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                  Invite Code
-                </label>
+                <label className="field-label" htmlFor="code">Invite code</label>
                 <input
+                  id="code"
                   type="text"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="Enter your invite code"
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent font-mono tracking-widest"
+                  className="input font-mono tracking-widest"
                   required
                 />
-                <p className="text-xs text-slate-400 mt-1.5">
+                <p className="text-xs text-muted mt-1.5">
                   Contact your administrator if you don&apos;t have your invite code
                 </p>
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-700 text-sm flex items-start gap-2">
+                <div className="rounded-control bg-danger/10 px-4 py-3 text-danger text-sm flex items-start gap-2" role="alert">
                   <span className="mt-0.5 flex-shrink-0">⚠</span>
                   <span>{error}</span>
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors text-sm shadow-sm"
-              >
-                {submitting ? 'Creating account...' : 'Create Account'}
+              <button type="submit" disabled={submitting} className="btn-primary w-full !py-3.5 mt-2">
+                {submitting ? 'Creating account…' : 'Create account'}
               </button>
             </form>
 
-            <div className="mt-6 pt-6 border-t border-slate-100 text-center">
-              <p className="text-sm text-slate-500">
+            <div className="mt-7 pt-6 border-t border-line text-center space-y-2">
+              <p className="text-sm text-muted">
                 Already have an account?{' '}
-                <Link href="/" className="text-violet-600 hover:text-violet-800 font-semibold">
-                  Sign in
-                </Link>
+                <Link href="/" className="text-accent font-semibold hover:underline">Sign in</Link>
               </p>
-              <p className="text-xs text-slate-400 mt-2">
+              <p className="text-xs text-muted">
                 Students register on the{' '}
-                <Link href="/" className="text-sky-600 hover:text-sky-800">
-                  main sign-up page
-                </Link>
+                <Link href="/" className="text-accent hover:underline">main sign-up page</Link>
               </p>
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

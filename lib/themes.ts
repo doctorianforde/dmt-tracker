@@ -1,274 +1,84 @@
 import type { ThemeChoice, ThemeConfig, ThemeMarkers } from '@/types';
 
-export const THEME_MARKERS: Record<ThemeChoice, ThemeMarkers> = {
-  light: {
-    pending: '○',
-    inProgress: '◑',
-    completed: '●',
-    approved: '✅',
-  },
-  flower: {
-    pending: '🌱',
-    inProgress: '🌿',
-    completed: '🌸',
-    approved: '💐',
-  },
-  pastel: {
-    pending: '○',
-    inProgress: '◑',
-    completed: '●',
-    approved: '✅',
-  },
-  football: {
-    pending: '⚽',
-    inProgress: '🏃‍♂️',
-    completed: '⚽️',
-    approved: '🏆',
-  },
-  dark: {
-    pending: '◇',
-    inProgress: '◈',
-    completed: '◆',
-    approved: '⭐',
-  },
-  mario: {
-    pending: '🧱',
-    inProgress: '❓',
-    completed: '🍄',
-    approved: '🌟',
-  },
-};
+// Each theme's colours, fonts and background are CSS variables in
+// app/globals.css under [data-theme="<choice>"]. Components use the semantic
+// Tailwind colours (bg-surface, text-ink, bg-accent, …) so they restyle
+// automatically when the theme changes.
 
 export const THEMES: Record<ThemeChoice, ThemeConfig> = {
   light: {
-    name: 'Light',
+    name: 'Paper',
     emoji: '☀️',
-    navVariant: 'light',
-    bgImage: 'https://images.pexels.com/photos/5745683/pexels-photo-5745683.jpeg?auto=compress&cs=tinysrgb&w=1920',
-    bgOverlay: 'bg-slate-100/40',
-    pageBg: 'bg-slate-100',
-    cardBg: 'bg-white',
-    cardBorder: 'border-slate-200',
-    headingColor: 'text-slate-900',
-    bodyText: 'text-slate-700',
-    mutedText: 'text-slate-500',
-    button: 'bg-sky-600 hover:bg-sky-700',
-    progressGradient: 'from-sky-400 to-sky-600',
-    progressTrack: 'bg-slate-100',
-    sectionCheckedBg: 'bg-sky-50',
-    sectionCheckedBorder: 'border-sky-300',
-    sectionCheckedText: 'text-sky-900',
-    sectionUncheckedBg: 'bg-white',
-    sectionUncheckedBorder: 'border-slate-200',
-    checkboxActiveBg: 'bg-sky-500',
-    checkboxActiveBorder: 'border-sky-500',
-    checkboxInactiveBg: 'bg-white',
-    checkboxInactiveBorder: 'border-slate-300',
-    inputBg: 'bg-white',
-    inputBorder: 'border-slate-200',
-    inputFocus: 'focus:ring-sky-500',
-    inputText: 'text-slate-900',
-    labelColor: 'text-slate-500',
-    selectBg: 'bg-white',
-    themeButtonActive: 'border-sky-500 bg-sky-50 text-sky-800',
-    themeButtonInactive: 'border-slate-200 text-slate-600 hover:border-slate-300',
+    tagline: 'Warm paper, ink and electric blue',
+    swatch: ['#F6F4EF', '#FFFFFF', '#3B5BFD'],
   },
   flower: {
-    name: 'Flower',
+    name: 'Bloom',
     emoji: '🌸',
-    navVariant: 'light',
-    bgImage: 'https://images.pexels.com/photos/701816/pexels-photo-701816.jpeg?auto=compress&cs=tinysrgb&w=1920',
-    bgOverlay: 'bg-gradient-to-br from-pink-300/45 via-rose-200/35 to-fuchsia-200/45',
-    pageBg: 'bg-gradient-to-br from-pink-300 via-rose-200 to-fuchsia-200',
-    cardBg: 'bg-pink-50',
-    cardBorder: 'border-pink-300',
-    headingColor: 'text-rose-900',
-    bodyText: 'text-rose-800',
-    mutedText: 'text-pink-500',
-    button: 'bg-fuchsia-600 hover:bg-fuchsia-700',
-    progressGradient: 'from-pink-400 to-fuchsia-500',
-    progressTrack: 'bg-pink-100',
-    sectionCheckedBg: 'bg-rose-100',
-    sectionCheckedBorder: 'border-fuchsia-400',
-    sectionCheckedText: 'text-rose-900',
-    sectionUncheckedBg: 'bg-pink-50',
-    sectionUncheckedBorder: 'border-pink-200',
-    checkboxActiveBg: 'bg-fuchsia-500',
-    checkboxActiveBorder: 'border-fuchsia-500',
-    checkboxInactiveBg: 'bg-white',
-    checkboxInactiveBorder: 'border-pink-300',
-    inputBg: 'bg-white',
-    inputBorder: 'border-pink-300',
-    inputFocus: 'focus:ring-fuchsia-400',
-    inputText: 'text-slate-900',
-    labelColor: 'text-pink-600',
-    selectBg: 'bg-white',
-    themeButtonActive: 'border-fuchsia-500 bg-pink-50 text-fuchsia-800',
-    themeButtonInactive: 'border-pink-200 text-pink-700 hover:border-pink-400',
+    tagline: 'Blush petals and serif headlines',
+    swatch: ['#FFE9EE', '#FFFFFF', '#E0457B'],
   },
   pastel: {
-    name: 'Pastel',
-    emoji: '🎨',
-    navVariant: 'light',
-    bgImage: 'https://images.pexels.com/photos/5126290/pexels-photo-5126290.jpeg?auto=compress&cs=tinysrgb&w=1920',
-    bgOverlay: 'bg-gradient-to-br from-violet-200/45 via-purple-100/35 to-indigo-200/45',
-    pageBg: 'bg-gradient-to-br from-violet-200 via-purple-100 to-indigo-200',
-    cardBg: 'bg-purple-50',
-    cardBorder: 'border-violet-300',
-    headingColor: 'text-violet-900',
-    bodyText: 'text-purple-800',
-    mutedText: 'text-violet-500',
-    button: 'bg-violet-600 hover:bg-violet-700',
-    progressGradient: 'from-violet-400 to-indigo-500',
-    progressTrack: 'bg-violet-100',
-    sectionCheckedBg: 'bg-violet-100',
-    sectionCheckedBorder: 'border-violet-400',
-    sectionCheckedText: 'text-violet-900',
-    sectionUncheckedBg: 'bg-purple-50',
-    sectionUncheckedBorder: 'border-violet-200',
-    checkboxActiveBg: 'bg-violet-500',
-    checkboxActiveBorder: 'border-violet-500',
-    checkboxInactiveBg: 'bg-white',
-    checkboxInactiveBorder: 'border-violet-300',
-    inputBg: 'bg-white',
-    inputBorder: 'border-violet-200',
-    inputFocus: 'focus:ring-violet-400',
-    inputText: 'text-slate-900',
-    labelColor: 'text-violet-600',
-    selectBg: 'bg-white',
-    themeButtonActive: 'border-violet-500 bg-violet-50 text-violet-800',
-    themeButtonInactive: 'border-violet-200 text-violet-700 hover:border-violet-400',
+    name: 'Sorbet',
+    emoji: '🍧',
+    tagline: 'Soft mint, peach and lavender',
+    swatch: ['#EFEAFF', '#FFFFFF', '#7C5CFF'],
   },
   football: {
-    name: 'Football',
+    name: 'Matchday',
     emoji: '⚽',
-    navVariant: 'dark',
-    bgImage: 'https://images.pexels.com/photos/46798/the-ball-stadion-football-the-pitch-46798.jpeg?auto=compress&cs=tinysrgb&w=1920',
-    bgOverlay: 'bg-gradient-to-b from-green-900/55 to-green-800/45',
-    pageBg: 'bg-gradient-to-b from-green-900 to-green-800',
-    cardBg: 'bg-white/95 backdrop-blur-sm',
-    cardBorder: 'border-yellow-500 border-2',
-    headingColor: 'text-green-950 font-bold uppercase tracking-wide',
-    bodyText: 'text-gray-800',
-    mutedText: 'text-green-700',
-    button: 'bg-yellow-500 hover:bg-yellow-600 text-black font-bold shadow-md border-b-4 border-yellow-700 active:border-b-0 active:translate-y-1',
-    progressGradient: 'from-yellow-400 to-yellow-600',
-    progressTrack: 'bg-green-200',
-    sectionCheckedBg: 'bg-green-50',
-    sectionCheckedBorder: 'border-yellow-500 border-2',
-    sectionCheckedText: 'text-green-900 font-bold',
-    sectionUncheckedBg: 'bg-white/80',
-    sectionUncheckedBorder: 'border-gray-300 border-2',
-    checkboxActiveBg: 'bg-green-600',
-    checkboxActiveBorder: 'border-yellow-500',
-    checkboxInactiveBg: 'bg-gray-100',
-    checkboxInactiveBorder: 'border-gray-400',
-    inputBg: 'bg-white',
-    inputBorder: 'border-gray-300 border-2',
-    inputFocus: 'focus:ring-yellow-500 focus:border-yellow-500',
-    inputText: 'text-black font-mono',
-    labelColor: 'text-green-800 font-semibold',
-    selectBg: 'bg-white',
-    themeButtonActive: 'border-yellow-500 bg-yellow-100 text-green-900 border-2 font-bold',
-    themeButtonInactive: 'border-gray-300 text-gray-600 hover:border-gray-400 border-2',
+    tagline: 'Striped pitch, floodlights and gold',
+    swatch: ['#0C3A26', '#FFFFFF', '#F5C400'],
   },
   dark: {
-    name: 'Dark',
+    name: 'Midnight',
     emoji: '🌙',
-    navVariant: 'dark',
-    bgImage: 'https://images.pexels.com/photos/11737041/pexels-photo-11737041.jpeg?auto=compress&cs=tinysrgb&w=1920',
-    bgOverlay: 'bg-slate-950/55',
-    pageBg: 'bg-slate-950',
-    cardBg: 'bg-slate-900',
-    cardBorder: 'border-slate-700',
-    headingColor: 'text-white',
-    bodyText: 'text-slate-300',
-    mutedText: 'text-slate-500',
-    button: 'bg-violet-600 hover:bg-violet-700',
-    progressGradient: 'from-violet-500 to-indigo-600',
-    progressTrack: 'bg-slate-800',
-    sectionCheckedBg: 'bg-slate-800',
-    sectionCheckedBorder: 'border-violet-500',
-    sectionCheckedText: 'text-violet-300',
-    sectionUncheckedBg: 'bg-slate-900',
-    sectionUncheckedBorder: 'border-slate-700',
-    checkboxActiveBg: 'bg-violet-500',
-    checkboxActiveBorder: 'border-violet-500',
-    checkboxInactiveBg: 'bg-slate-800',
-    checkboxInactiveBorder: 'border-slate-600',
-    inputBg: 'bg-slate-800',
-    inputBorder: 'border-slate-700',
-    inputFocus: 'focus:ring-violet-500',
-    inputText: 'text-white',
-    labelColor: 'text-slate-400',
-    selectBg: 'bg-slate-800',
-    themeButtonActive: 'border-violet-500 bg-slate-800 text-violet-400',
-    themeButtonInactive: 'border-slate-700 text-slate-400 hover:border-slate-600',
+    tagline: 'Deep ink with a lime glow',
+    swatch: ['#0B0C10', '#16171D', '#C6F432'],
   },
   mario: {
-    name: 'Mario',
+    name: 'Retro',
     emoji: '🍄',
-    navVariant: 'dark',
-    bgImage: 'https://images.pexels.com/photos/14000840/pexels-photo-14000840.jpeg?auto=compress&cs=tinysrgb&w=1920',
-    bgOverlay: 'bg-[#5C94FC]/40',
-    pageBg: 'bg-[#5C94FC]',
-    cardBg: 'bg-[#F8D870]',
-    cardBorder: 'border-black border-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]',
-    headingColor: 'text-[#E4000F]',
-    bodyText: 'text-black font-mono',
-    mutedText: 'text-gray-800 font-mono',
-    button: 'bg-red-600 hover:bg-red-700 border-2 border-black text-white font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5',
-    progressGradient: 'from-yellow-400 to-orange-500',
-    progressTrack: 'bg-gray-300 border-black border-2',
-    sectionCheckedBg: 'bg-green-400',
-    sectionCheckedBorder: 'border-green-700 border-2',
-    sectionCheckedText: 'text-white font-bold',
-    sectionUncheckedBg: 'bg-[#F8D870]',
-    sectionUncheckedBorder: 'border-black border-2',
-    checkboxActiveBg: 'bg-red-600',
-    checkboxActiveBorder: 'border-black',
-    checkboxInactiveBg: 'bg-white',
-    checkboxInactiveBorder: 'border-gray-400',
-    inputBg: 'bg-white',
-    inputBorder: 'border-black border-2 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]',
-    inputFocus: 'focus:ring-red-500 focus:border-red-600',
-    inputText: 'text-black font-mono',
-    labelColor: 'text-gray-900 font-bold',
-    selectBg: 'bg-white',
-    themeButtonActive: 'border-red-600 bg-red-100 text-red-800 border-2',
-    themeButtonInactive: 'border-gray-300 text-gray-600 hover:border-gray-400 border-2',
+    tagline: '8-bit skies, bricks and power-ups',
+    swatch: ['#5C94FC', '#FFF8DC', '#E4000F'],
   },
+};
+
+export const THEME_MARKERS: Record<ThemeChoice, ThemeMarkers> = {
+  light: { pending: '○', completed: '●', approved: '✅' },
+  flower: { pending: '🌱', completed: '🌸', approved: '💐' },
+  pastel: { pending: '🫧', completed: '🍬', approved: '🌈' },
+  football: { pending: '⚽', completed: '🥅', approved: '🏆' },
+  dark: { pending: '◇', completed: '◆', approved: '⭐' },
+  mario: { pending: '🧱', completed: '🍄', approved: '🌟' },
 };
 
 export const THEME_ORDER: ThemeChoice[] = ['light', 'flower', 'pastel', 'football', 'dark', 'mario'];
 
-const STORAGE_KEY = 'dmt-tracker-theme';
+export const THEME_STORAGE_KEY = 'dmt-tracker-theme';
+
+export function isThemeChoice(value: unknown): value is ThemeChoice {
+  return typeof value === 'string' && value in THEMES;
+}
 
 export function getSavedTheme(): ThemeChoice {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined') return 'light';
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    return isThemeChoice(saved) ? saved : 'light';
+  } catch {
     return 'light';
   }
-  const saved = localStorage.getItem(STORAGE_KEY) as ThemeChoice | null;
-  if (saved && Object.keys(THEMES).includes(saved)) {
-    return saved;
-  }
-  return 'light';
 }
 
 export function setSavedTheme(theme: ThemeChoice): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, theme);
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch {
+    // Storage can be unavailable (private mode) — the theme still applies
+    // for this session and is saved to the user's profile.
   }
-}
-
-export function getThemeAspects(theme: ThemeChoice): {
-  config: ThemeConfig;
-  markers: ThemeMarkers;
-} {
-  return {
-    config: THEMES[theme],
-    markers: THEME_MARKERS[theme],
-  };
 }
 
 // ── Motivational Quotes ────────────────────────────────────────────────────────

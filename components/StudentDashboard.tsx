@@ -2,19 +2,27 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { useTheme } from '@/contexts/ThemeContext';
 import AuthGuard from '@/components/AuthGuard';
 import Navbar from '@/components/Navbar';
 import DeadlineCountdown from '@/components/DeadlineCountdown';
+import DeadlineCalendar from '@/components/DeadlineCalendar';
 import ProgressChecklist from '@/components/ProgressChecklist';
+import AvatarUpload from '@/components/ui/AvatarUpload';
+import ProgressRing from '@/components/ui/ProgressRing';
+import SectionHeader from '@/components/ui/SectionHeader';
 import {
   getCaseRecord,
   saveCaseRecord,
   submitCaseForReview,
+  resubmitCase,
   updateUserProfile,
 } from '@/lib/firestore';
-import type { CaseRecord, CaseSections, ApprovalStage, ThemeChoice, UserRole } from '@/types';
-import { THEMES, THEME_ORDER } from '@/lib/themes';
-import { DEFAULT_DEADLINE, START_YEAR_MIN, START_YEAR_MAX, CLASS_YEARS } from '@/lib/config';
+import type { CaseRecord, CaseSections, ApprovalStage, UserRole } from '@/types';
+import { START_YEAR_MIN, START_YEAR_MAX, CLASS_YEARS, ACCOUNTABILITY_WINDOW_DAYS } from '@/lib/config';
+import { daysUntil, effectiveDeadline } from '@/lib/deadlines';
+
+const SECTION_KEYS: (keyof CaseSections)[] = ['intro', 'caseReport', 'discussion', 'conclusion', 'references'];
 
 const DEFAULT_SECTIONS: CaseSections = {
   intro: false,
@@ -24,17 +32,18 @@ const DEFAULT_SECTIONS: CaseSections = {
   references: false,
 };
 
-const STAGE_CONFIG: Record<ApprovalStage, { label: string; color: string; step: number; emoji: string }> = {
-  pending: { label: 'Not Yet Submitted', color: 'bg-slate-200', step: 0, emoji: '⏳' },
-  supervisor: { label: 'Supervisor Reviewing', color: 'bg-orange-400', step: 1, emoji: '🟠' },
-  lecturer: { label: 'Lecturer Reviewing', color: 'bg-yellow-300', step: 2, emoji: '🔆' },
-  approved: { label: 'Approved!', color: 'bg-emerald-500', step: 3, emoji: '✅' },
+const STAGE_INFO: Record<ApprovalStage, { label: string; step: number }> = {
+  pending: { label: 'Draft — not yet submitted', step: 0 },
+  supervisor: { label: 'With your supervisor', step: 1 },
+  lecturer: { label: 'With the Lecturer', step: 2 },
+  approved: { label: 'Approved', step: 3 },
 };
 
-const PIPELINE_STEPS: { stage: ApprovalStage; label: string; color: string }[] = [
-  { stage: 'supervisor', label: 'Supervisor', color: 'bg-orange-400' },
-  { stage: 'lecturer', label: 'Lecturer', color: 'bg-yellow-300' },
-  { stage: 'approved', label: 'Approved', color: 'bg-emerald-500' },
+const PIPELINE_STEPS: { stage: ApprovalStage; label: string; dot: string }[] = [
+  { stage: 'pending', label: 'Draft', dot: 'bg-ink' },
+  { stage: 'supervisor', label: 'Supervisor', dot: 'bg-warn' },
+  { stage: 'lecturer', label: 'Lecturer', dot: 'bg-gold' },
+  { stage: 'approved', label: 'Approved', dot: 'bg-ok' },
 ];
 
 // Defined once at module scope — see the same note in SupervisorDashboard.tsx.
@@ -48,8 +57,26 @@ export default function StudentDashboard() {
   );
 }
 
+// A stable string of the editable form fields, for unsaved-change detection.
+function formSnapshot(f: {
+  caseNumber: string;
+  startYear: number;
+  classYear: number;
+  sections: CaseSections;
+  extensionReason: string;
+}) {
+  return JSON.stringify([
+    f.caseNumber.trim(),
+    f.startYear,
+    f.classYear,
+    SECTION_KEYS.map((k) => Boolean(f.sections[k])),
+    f.extensionReason.trim(),
+  ]);
+}
+
 function Dashboard() {
   const { user, userProfile, refreshProfile } = useAuth();
+  const { themeMarkers, activeQuote } = useTheme();
 
   const [caseRecord, setCaseRecord] = useState<CaseRecord | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
@@ -61,31 +88,30 @@ function Dashboard() {
   const [caseNumber, setCaseNumber] = useState('');
   const [startYear, setStartYear] = useState(new Date().getFullYear());
   const [classYear, setClassYear] = useState(1);
-  const [customDeadline, setCustomDeadline] = useState('');
   const [sections, setSections] = useState<CaseSections>(DEFAULT_SECTIONS);
-
   const [extensionReason, setExtensionReason] = useState('');
   const [showExtension, setShowExtension] = useState(false);
-  const [theme, setTheme] = useState<ThemeChoice>('light');
 
-  const isProfileSetup = !!userProfile?.caseNumber;
-  const themeConfig = THEMES[theme];
+  const uid = user?.uid;
+  const profileCaseNumber = userProfile?.caseNumber;
+  const profileStartYear = userProfile?.startYear;
+  const profileClassYear = userProfile?.classYear;
+  const isProfileSetup = !!profileCaseNumber;
 
+  // Keyed on the fields that define the form (not the whole profile object),
+  // so e.g. uploading a photo doesn't reset unsaved edits.
   useEffect(() => {
     async function load() {
-      if (!user || !userProfile) return;
+      if (!uid) return;
       try {
-        if (userProfile.theme) setTheme(userProfile.theme);
-
-        if (userProfile.caseNumber) {
-          setCaseNumber(userProfile.caseNumber);
-          setStartYear(userProfile.startYear ?? new Date().getFullYear());
-          setClassYear(userProfile.classYear ?? 1);
-          const rec = await getCaseRecord(userProfile.caseNumber);
+        if (profileCaseNumber) {
+          setCaseNumber(profileCaseNumber);
+          setStartYear(profileStartYear ?? new Date().getFullYear());
+          setClassYear(profileClassYear ?? 1);
+          const rec = await getCaseRecord(profileCaseNumber);
           if (rec) {
             setCaseRecord(rec);
-            setSections(rec.sections ?? DEFAULT_SECTIONS);
-            setCustomDeadline(rec.customDeadline ?? '');
+            setSections({ ...DEFAULT_SECTIONS, ...rec.sections });
             setExtensionReason(rec.extensionReason ?? '');
           }
         }
@@ -97,30 +123,26 @@ function Dashboard() {
       }
     }
     load();
-  }, [user, userProfile]);
+  }, [uid, profileCaseNumber, profileStartYear, profileClassYear]);
 
   const showMessage = (text: string, ok: boolean) => {
     setSaveMessage({ text, ok });
     setTimeout(() => setSaveMessage(null), 4000);
   };
 
-  const handleSubmitForReview = async () => {
-    if (!userProfile?.caseNumber) return;
-    setSubmitting(true);
-    try {
-      await submitCaseForReview(userProfile.caseNumber);
-      setCaseRecord((prev) => (prev ? { ...prev, approvalStage: 'supervisor' } : prev));
-      showMessage('Case submitted for review! 🎉', true);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      showMessage('Submission failed: ' + msg, false);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const dirty =
+    formSnapshot({ caseNumber, startYear, classYear, sections, extensionReason }) !==
+    formSnapshot({
+      caseNumber: profileCaseNumber ?? '',
+      startYear: profileStartYear ?? new Date().getFullYear(),
+      classYear: profileClassYear ?? 1,
+      sections: caseRecord?.sections ?? DEFAULT_SECTIONS,
+      extensionReason: caseRecord?.extensionReason ?? '',
+    });
 
-  const handleSave = async () => {
-    if (!user || !userProfile || !caseNumber.trim()) return;
+  // Saves the form. Returns false (after showing the error) on failure.
+  const persist = async (): Promise<boolean> => {
+    if (!user || !userProfile || !caseNumber.trim()) return false;
     setSaving(true);
     try {
       const payload: Partial<CaseRecord> = {
@@ -139,35 +161,66 @@ function Dashboard() {
         ...(!caseRecord && userProfile.assignedSupervisorUid
           ? { supervisorUid: userProfile.assignedSupervisorUid, supervisorName: userProfile.assignedSupervisorName }
           : {}),
-        ...(customDeadline ? { customDeadline } : {}),
         ...(extensionReason.trim() ? { extensionReason: extensionReason.trim() } : {}),
       };
 
       await saveCaseRecord(caseNumber.trim(), payload);
-      await updateUserProfile(user.uid, {
-        caseNumber: caseNumber.trim(),
-        startYear,
-        classYear,
-        theme,
-      });
-      await refreshProfile();
+      await updateUserProfile(user.uid, { caseNumber: caseNumber.trim(), startYear, classYear });
       const updated = await getCaseRecord(caseNumber.trim());
       setCaseRecord(updated);
-      showMessage('Progress saved! 🎉', true);
+      await refreshProfile();
+      return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
-      showMessage('Error saving: ' + msg, false);
+      showMessage('Couldn’t save: ' + msg, false);
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
+  const handleSave = async () => {
+    if (await persist()) showMessage('Progress saved', true);
+  };
+
+  const handleSubmitForReview = async () => {
+    if (!userProfile?.caseNumber) return;
+    if (dirty && !(await persist())) return;
+    setSubmitting(true);
+    try {
+      await submitCaseForReview(userProfile.caseNumber);
+      setCaseRecord((prev) => (prev ? { ...prev, approvalStage: 'supervisor' } : prev));
+      showMessage('Submitted for review 🎉', true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      showMessage('Submission failed: ' + msg, false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResubmit = async () => {
+    if (!userProfile?.caseNumber) return;
+    if (dirty && !(await persist())) return;
+    setSubmitting(true);
+    try {
+      await resubmitCase(userProfile.caseNumber);
+      setCaseRecord((prev) => (prev ? { ...prev, resubmittedAt: new Date() } : prev));
+      showMessage('Your reviewer has been told it’s ready for another look', true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      showMessage('Couldn’t resubmit: ' + msg, false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (dataLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-400 text-sm">Loading your profile...</p>
+          <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+          <p className="text-on-canvas-muted text-sm">Loading your profile…</p>
         </div>
       </div>
     );
@@ -175,14 +228,11 @@ function Dashboard() {
 
   if (loadError) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-        <div className="bg-white border border-red-200 rounded-2xl p-6 max-w-md text-center shadow-sm">
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="card p-6 max-w-md text-center">
           <p className="text-3xl mb-3">⚠️</p>
-          <p className="font-semibold text-red-700">{loadError}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700"
-          >
+          <p className="font-semibold text-danger">{loadError}</p>
+          <button onClick={() => window.location.reload()} className="btn-primary mt-4">
             Retry
           </button>
         </div>
@@ -190,313 +240,292 @@ function Dashboard() {
     );
   }
 
-  const completedCount = Object.values(sections).filter(Boolean).length;
-  const completionPercent = Math.round((completedCount / 5) * 100);
-  const firstName = userProfile?.name?.split(' ')[0] ?? 'Student';
+  const completedCount = SECTION_KEYS.filter((k) => sections[k]).length;
+  const completionPercent = Math.round((completedCount / SECTION_KEYS.length) * 100);
+  const firstName = userProfile?.name?.replace(/^(dr\.?|prof\.?)\s+/i, '').split(' ')[0] ?? 'there';
   const approvalStage: ApprovalStage = caseRecord?.approvalStage ?? (caseRecord?.greenLight ? 'approved' : 'pending');
-  const stageInfo = STAGE_CONFIG[approvalStage];
+  const stageInfo = STAGE_INFO[approvalStage];
 
   const currentStageApproval =
     approvalStage === 'supervisor' ? caseRecord?.supervisorApproval
     : approvalStage === 'lecturer' ? caseRecord?.lecturerApproval
     : undefined;
   const rejectionReason = !currentStageApproval?.approved ? currentStageApproval?.rejectionReason : undefined;
+  const rejectedAt = currentStageApproval?.rejectedAt;
+  const resubmitted =
+    !!rejectionReason && !!caseRecord?.resubmittedAt &&
+    (!rejectedAt || caseRecord.resubmittedAt.getTime() > rejectedAt.getTime());
 
-  // Check if deadline is within 30 days
-  const deadlineDate = customDeadline ? new Date(customDeadline + 'T23:59:59') : new Date(`${DEFAULT_DEADLINE}T23:59:59`);
-  const daysLeft = Math.ceil((deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-  const deadlineUrgent = daysLeft <= 30;
+  const deadline = effectiveDeadline(userProfile, caseRecord);
+  const daysLeft = deadline ? daysUntil(deadline) : Infinity;
+  const deadlineClose = daysLeft <= ACCOUNTABILITY_WINDOW_DAYS;
+  const showAccountability = deadlineClose || showExtension || !!extensionReason;
 
-  // Input style helpers
-  const inputClass = `w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-shadow
-    ${themeConfig.inputBg} ${themeConfig.inputBorder} ${themeConfig.inputFocus} ${themeConfig.inputText}`;
-
-  const labelClass = `block text-xs font-semibold uppercase tracking-wide mb-1.5 ${themeConfig.labelColor}`;
-
-  return (
-    <div className={`min-h-screen relative isolate ${themeConfig.pageBg}`}>
-      <div
-        className="fixed inset-0 -z-10 bg-cover bg-center"
-        style={{ backgroundImage: `url(${themeConfig.bgImage})` }}
+  const profileSection = (index: number) => (
+    <section>
+      <SectionHeader
+        index={index}
+        eyebrow="Profile"
+        title={isProfileSetup ? 'Your details' : 'Set up your profile'}
+        description={isProfileSetup ? undefined : 'Add your case number to start tracking. It’s locked after the first save.'}
       />
-      <div className={`fixed inset-0 -z-10 ${themeConfig.bgOverlay}`} />
-      <Navbar variant={themeConfig.navVariant} />
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
-
-        {/* Header */}
+      <div className="card p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="sm:col-span-2">
+          <label className="field-label" htmlFor="case-number">Case number</label>
+          <input
+            id="case-number"
+            type="text"
+            value={caseNumber}
+            onChange={(e) => setCaseNumber(e.target.value)}
+            placeholder="e.g. DMT-2026-001"
+            disabled={isProfileSetup}
+            className="input font-mono"
+          />
+          {isProfileSetup && <p className="text-xs text-muted mt-1.5">Locked after first save</p>}
+        </div>
         <div>
-          <h1 className={`text-2xl font-bold ${themeConfig.headingColor}`}>
-            {isProfileSetup ? `Welcome back, ${firstName} ${stageInfo.emoji}` : 'Set Up Your Profile'}
-          </h1>
-          <p className={`text-sm mt-1 ${themeConfig.mutedText}`}>
-            {isProfileSetup
-              ? `Case ${userProfile?.caseNumber} · Year ${userProfile?.classYear} · Started ${userProfile?.startYear}`
-              : 'Complete your student profile below to begin tracking your case'}
+          <label className="field-label" htmlFor="start-year">Start year</label>
+          <input
+            id="start-year"
+            type="number"
+            value={startYear}
+            onChange={(e) => setStartYear(Number(e.target.value))}
+            min={START_YEAR_MIN}
+            max={START_YEAR_MAX}
+            className="input"
+          />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="class-year">Class year</label>
+          <select id="class-year" value={classYear} onChange={(e) => setClassYear(Number(e.target.value))} className="input">
+            {CLASS_YEARS.map((y) => (
+              <option key={y} value={y}>Year {y}</option>
+            ))}
+          </select>
+        </div>
+        <div className="sm:col-span-2">
+          <p className="field-label">Supervisor</p>
+          <p className="text-sm font-semibold text-ink">{userProfile?.assignedSupervisorName ?? 'Not yet assigned'}</p>
+          <p className="text-xs text-muted mt-1">
+            {userProfile?.assignedSupervisorName
+              ? 'Assigned by your Lecturer. Contact them if this needs to change.'
+              : 'Your Lecturer hasn’t assigned you a supervisor yet — check back before submitting for review.'}
           </p>
         </div>
+      </div>
+    </section>
+  );
 
-        {/* Theme Picker */}
-        <div className={`${themeConfig.cardBg} rounded-2xl border ${themeConfig.cardBorder} p-5`}>
-          <p className={`text-xs font-semibold uppercase tracking-wide mb-3 ${themeConfig.labelColor}`}>Choose Your Theme</p>
-          <div className="flex flex-wrap gap-2">
-            {THEME_ORDER.map((t) => {
-              const tc = THEMES[t];
-              return (
-                <button
-                  key={t}
-                  onClick={() => setTheme(t)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm font-medium transition-all
-                    ${theme === t ? tc.themeButtonActive : tc.themeButtonInactive}`}
-                >
-                  <span>{tc.emoji}</span>
-                  <span>{tc.name}</span>
-                  {theme === t && <span className="ml-0.5 text-xs">✓</span>}
-                </button>
-              );
-            })}
+  let n = 0;
+
+  return (
+    <div className="min-h-screen pb-32">
+      <Navbar />
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 sm:pt-14 space-y-14">
+
+        {/* Hero */}
+        <header className="grid gap-8 lg:grid-cols-[auto_1fr_auto] items-center">
+          <AvatarUpload size={112} />
+          <div className="min-w-0">
+            <p className="eyebrow text-on-canvas-muted">
+              {isProfileSetup
+                ? `Case ${userProfile?.caseNumber} · Year ${userProfile?.classYear} · Started ${userProfile?.startYear}`
+                : 'Welcome to VIS'}
+            </p>
+            <h1 className="display text-5xl sm:text-6xl leading-[0.95] text-on-canvas on-canvas-text mt-3">
+              Hello, {firstName}.
+            </h1>
+            <p className="text-base text-on-canvas-muted mt-4 max-w-xl italic" suppressHydrationWarning>
+              “{activeQuote}”
+            </p>
           </div>
-        </div>
+          <div className="card p-5 flex items-center gap-5">
+            <ProgressRing percent={completionPercent} />
+            <div>
+              <p className="eyebrow text-muted">Status</p>
+              <p className="display text-xl text-ink mt-1 max-w-[10rem] leading-tight">{stageInfo.label}</p>
+              {approvalStage === 'approved' && <p className="text-2xl mt-1" aria-hidden>{themeMarkers.approved}</p>}
+            </div>
+          </div>
+        </header>
 
-        <DeadlineCountdown customDeadline={customDeadline || undefined} completionPercent={completionPercent} />
+        {/* Review feedback */}
+        {rejectionReason && !resubmitted && (
+          <div className="card p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 border-danger/40">
+            <span className="w-11 h-11 rounded-full bg-danger/15 text-danger flex items-center justify-center text-lg flex-shrink-0" aria-hidden>✕</span>
+            <div className="flex-1">
+              <p className="font-bold text-ink">Changes requested</p>
+              <p className="text-sm text-ink/80 mt-0.5">“{rejectionReason}”</p>
+              <p className="text-xs text-muted mt-1.5">Make the changes, then let your reviewer know it’s ready for another look.</p>
+            </div>
+            <button onClick={handleResubmit} disabled={submitting || saving} className="btn-primary whitespace-nowrap">
+              {submitting ? 'Sending…' : 'Mark as ready for re-review'}
+            </button>
+          </div>
+        )}
+        {resubmitted && (
+          <div className="card p-5 flex items-center gap-4">
+            <span className="w-11 h-11 rounded-full bg-info/15 text-info flex items-center justify-center text-lg flex-shrink-0" aria-hidden>↻</span>
+            <div>
+              <p className="font-bold text-ink">Resubmitted for re-review</p>
+              <p className="text-sm text-muted mt-0.5">Your reviewer can see you’ve addressed their feedback: “{rejectionReason}”</p>
+            </div>
+          </div>
+        )}
+        {approvalStage === 'approved' && (
+          <div className="card p-5 flex items-center gap-4">
+            <span className="w-11 h-11 rounded-full bg-ok/15 text-ok flex items-center justify-center text-xl flex-shrink-0" aria-hidden>✓</span>
+            <div>
+              <p className="font-bold text-ink">Case approved 🎉</p>
+              <p className="text-sm text-muted mt-0.5">Your Lecturer has given your case report final approval.</p>
+            </div>
+          </div>
+        )}
 
-        {/* Approval Pipeline */}
-        <div className={`${themeConfig.cardBg} rounded-2xl border ${themeConfig.cardBorder} p-6`}>
-          <h2 className={`font-bold mb-4 ${themeConfig.headingColor}`}>Submission Progress</h2>
-          <div className="flex items-center gap-1">
-            {PIPELINE_STEPS.map((step, i) => {
-              const isReached = STAGE_CONFIG[approvalStage].step > i;
-              const isCurrent = approvalStage === step.stage;
-              return (
-                <div key={step.stage} className="flex items-center flex-1">
-                  <div className="flex flex-col items-center flex-1">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all
-                        ${isCurrent ? `${step.color} text-white scale-110 shadow-md` : ''}
-                        ${isReached ? `${step.color} text-white` : 'bg-slate-200 text-slate-400'}
-                      `}
+        {!isProfileSetup && profileSection(++n)}
+
+        {/* Timeline */}
+        <section>
+          <SectionHeader index={++n} eyebrow="Timeline" title="Your deadline" description="Set by your supervisor or lecturer." />
+          <div className="card p-6 sm:p-8 grid gap-8 md:grid-cols-[16rem_1fr]">
+            <DeadlineCountdown
+              deadline={deadline}
+              setByName={userProfile?.deadlineSetByName}
+              completionPercent={completionPercent}
+            />
+            <div className="md:border-l md:border-line md:pl-8">
+              <DeadlineCalendar
+                events={deadline ? [{ id: 'mine', date: deadline, label: 'Case submission', sublabel: userProfile?.caseNumber, photoURL: userProfile?.photoURL || undefined }] : []}
+                initialDate={deadline}
+                emptyMessage="No deadline set yet."
+                upcomingLimit={1}
+              />
+            </div>
+          </div>
+
+          {showAccountability ? (
+            <div className="card p-6 mt-4 border-warn/50">
+              <div className="flex items-start gap-3">
+                <span className="w-10 h-10 rounded-full bg-warn/15 text-warn flex items-center justify-center flex-shrink-0 font-bold" aria-hidden>!</span>
+                <div className="flex-1">
+                  <p className="font-bold text-ink">Accountability check</p>
+                  <p className="text-sm text-muted mt-0.5">
+                    {!deadlineClose
+                      ? 'Tell your supervisors early if you think you won’t make your deadline.'
+                      : daysLeft < 0
+                      ? 'Your deadline has passed. Let your supervisors know what’s happening.'
+                      : daysLeft <= 14
+                      ? `Your deadline is in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}. Are you on track?`
+                      : `Your deadline is approaching (${daysLeft} days). Let us know if you need an extension.`}
+                  </p>
+                </div>
+              </div>
+              <label className="field-label mt-5" htmlFor="extension-reason">Extension reason (if you can’t meet the deadline)</label>
+              <textarea
+                id="extension-reason"
+                value={extensionReason}
+                onChange={(e) => setExtensionReason(e.target.value)}
+                placeholder="Explain why you need more time so your supervisors are informed…"
+                rows={3}
+                className="input resize-none"
+              />
+              <p className="text-xs text-muted mt-1.5">Saved with your case and visible to your supervisor and Lecturer. Only they can change your deadline.</p>
+            </div>
+          ) : (
+            <button onClick={() => setShowExtension(true)} className="text-sm text-on-canvas-muted hover:underline mt-4">
+              Won’t make your deadline? Request an extension →
+            </button>
+          )}
+        </section>
+
+        {/* Review pipeline */}
+        <section>
+          <SectionHeader index={++n} eyebrow="Review" title="Approval pipeline" />
+          <div className="card p-6 sm:p-8">
+            <ol className="grid grid-cols-4">
+              {PIPELINE_STEPS.map((step, i) => {
+                const reached = stageInfo.step >= i;
+                const current = stageInfo.step === i;
+                return (
+                  <li key={step.stage} className="relative flex flex-col items-center text-center">
+                    {i > 0 && (
+                      <span
+                        className={`absolute top-4 right-1/2 w-full h-1 -z-0 rounded-full ${stageInfo.step >= i ? step.dot : 'bg-ink/10'}`}
+                        aria-hidden
+                      />
+                    )}
+                    <span
+                      className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition
+                        ${reached ? `${step.dot} text-white` : 'bg-surface2 text-muted'}
+                        ${current ? 'ring-4 ring-accent/25 scale-110' : ''}`}
                     >
-                      {isReached || isCurrent ? '✓' : i + 1}
-                    </div>
-                    <p className={`text-xs mt-1 text-center leading-tight max-w-[60px] ${isCurrent ? themeConfig.headingColor : themeConfig.mutedText}`}>
+                      {reached ? '✓' : i + 1}
+                    </span>
+                    <span className={`text-xs sm:text-sm mt-2 font-semibold ${current ? 'text-ink' : 'text-muted'}`}>
                       {step.stage === 'supervisor' && userProfile?.assignedSupervisorName
                         ? userProfile.assignedSupervisorName
                         : step.label}
-                    </p>
-                  </div>
-                  {i < PIPELINE_STEPS.length - 1 && (
-                    <div className={`h-0.5 flex-1 mx-1 rounded ${isReached ? step.color : 'bg-slate-200'}`} />
-                  )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+
+            {isProfileSetup && approvalStage === 'pending' && (
+              <div className="mt-8 pt-6 border-t border-line flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <p className="font-bold text-ink">Ready for review?</p>
+                  <p className="text-sm text-muted mt-0.5">
+                    {userProfile?.assignedSupervisorName
+                      ? `Send your case to ${userProfile.assignedSupervisorName} when you’re ready for feedback.`
+                      : 'You need a supervisor assigned by your Lecturer before you can submit.'}
+                  </p>
                 </div>
-              );
-            })}
-          </div>
-          <p className={`text-xs mt-4 font-medium ${themeConfig.mutedText}`}>
-            Current status: <span className={themeConfig.headingColor}>{stageInfo.emoji} {stageInfo.label}</span>
-          </p>
-        </div>
-
-        {/* Rejection feedback banner */}
-        {rejectionReason && (
-          <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-5 flex items-start gap-4">
-            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <span className="text-xl">❌</span>
-            </div>
-            <div>
-              <p className="font-bold text-red-800">Changes Requested</p>
-              <p className="text-red-600 text-sm mt-0.5">{rejectionReason}</p>
-              <p className="text-red-500 text-xs mt-1.5">
-                Update your case sections above, then check with your supervisor once you&apos;re ready for another review.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Approved banner */}
-        {approvalStage === 'approved' && (
-          <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-5 flex items-center gap-4">
-            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <span className="text-xl">✅</span>
-            </div>
-            <div>
-              <p className="font-bold text-emerald-800">Case Approved! 🎉</p>
-              <p className="text-emerald-600 text-sm mt-0.5">
-                Your Lecturer has fully approved your case report submission.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Profile Card */}
-        <div className={`${themeConfig.cardBg} rounded-2xl border ${themeConfig.cardBorder} p-6 space-y-5`}>
-          <h2 className={`font-bold ${themeConfig.headingColor}`}>Student Profile</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <label className={labelClass}>Student Name</label>
-              <div className={`px-4 py-3 ${themeConfig.inputBg} border ${themeConfig.inputBorder} rounded-xl text-sm font-medium ${themeConfig.bodyText}`}>
-                {userProfile?.name}
+                <button
+                  onClick={handleSubmitForReview}
+                  disabled={submitting || saving || !userProfile?.assignedSupervisorUid}
+                  className="btn-primary whitespace-nowrap"
+                >
+                  {submitting ? 'Submitting…' : 'Submit for review →'}
+                </button>
               </div>
-            </div>
-            <div className="sm:col-span-2">
-              <label className={labelClass}>Case Number</label>
-              <input
-                type="text"
-                value={caseNumber}
-                onChange={(e) => setCaseNumber(e.target.value)}
-                placeholder="e.g. DMT-2024-001"
-                disabled={isProfileSetup}
-                className={`${inputClass} disabled:opacity-60 disabled:cursor-not-allowed`}
-              />
-              {isProfileSetup && (
-                <p className={`text-xs mt-1.5 ${themeConfig.mutedText}`}>Case number is locked after first save</p>
-              )}
-            </div>
-            <div>
-              <label className={labelClass}>Start Year</label>
-              <input
-                type="number"
-                value={startYear}
-                onChange={(e) => setStartYear(Number(e.target.value))}
-                min={START_YEAR_MIN}
-                max={START_YEAR_MAX}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Class Year</label>
-              <select
-                value={classYear}
-                onChange={(e) => setClassYear(Number(e.target.value))}
-                className={`${inputClass} ${themeConfig.selectBg}`}
-              >
-                {CLASS_YEARS.map((y) => (
-                  <option key={y} value={y}>Year {y}</option>
-                ))}
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label className={labelClass}>Deadline for Submission</label>
-              <input
-                type="date"
-                value={customDeadline}
-                onChange={(e) => setCustomDeadline(e.target.value)}
-                className={inputClass}
-              />
-              <p className={`text-xs mt-1.5 ${themeConfig.mutedText}`}>
-                Leave blank to use the default deadline (June 30, 2026)
-              </p>
-            </div>
-            <div className="sm:col-span-2">
-              <label className={labelClass}>Your Supervisor</label>
-              <div className={`px-4 py-3 ${themeConfig.inputBg} border ${themeConfig.inputBorder} rounded-xl text-sm font-medium ${themeConfig.bodyText}`}>
-                {userProfile?.assignedSupervisorName ?? 'Not yet assigned'}
-              </div>
-              <p className={`text-xs mt-1.5 ${themeConfig.mutedText}`}>
-                {userProfile?.assignedSupervisorName
-                  ? 'Assigned by your Lecturer. Contact them if this needs to change.'
-                  : 'Your Lecturer hasn’t assigned you a supervisor yet — check back before submitting for review.'}
-              </p>
-            </div>
+            )}
           </div>
-        </div>
+        </section>
 
-        {/* Case Sections - RED category */}
-        <div className={`${themeConfig.cardBg} rounded-2xl border-2 border-red-300 p-6 space-y-5`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-400 inline-block" />
-                <h2 className={`font-bold ${themeConfig.headingColor}`}>Case Sections</h2>
-                <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-semibold">Required</span>
-              </div>
-              <p className={`text-xs mt-0.5 ${themeConfig.mutedText}`}>Track completion of each section of your case report</p>
-            </div>
-            <span className={`text-sm tabular-nums font-semibold ${themeConfig.mutedText}`}>{completedCount} / 5</span>
+        {/* Case sections */}
+        <section>
+          <SectionHeader
+            index={++n}
+            eyebrow="Progress"
+            title="Case sections"
+            description="Tick off each section of your case report as you finish it."
+          />
+          <div className="card p-6 sm:p-8">
+            <ProgressChecklist sections={sections} onChange={setSections} markers={themeMarkers} />
           </div>
-          <ProgressChecklist sections={sections} onChange={setSections} theme={themeConfig} />
-        </div>
+        </section>
 
-        {/* Accountability Section */}
-        {(daysLeft <= 30 || showExtension || extensionReason) && (
-          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-6 space-y-4">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl">⚠️</span>
-              <div className="flex-1">
-                <h2 className="font-bold text-amber-900">Accountability Check</h2>
-                <p className="text-sm text-amber-700 mt-1">
-                  {daysLeft <= 14
-                    ? `Your deadline is in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}! Are you on track?`
-                    : `Your deadline is approaching (${daysLeft} days). Let us know if you need an extension.`
-                  }
-                </p>
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1.5">
-                Extension Reason (if deadline cannot be met)
-              </label>
-              <textarea
-                value={extensionReason}
-                onChange={(e) => setExtensionReason(e.target.value)}
-                placeholder="If you cannot meet your deadline, please explain your reason here so your supervisors are informed..."
-                rows={3}
-                className="w-full px-4 py-3 border-2 border-amber-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white text-slate-900 resize-none"
-              />
-              <p className="text-xs text-amber-600 mt-1.5">
-                This will be saved with your case record and visible to supervisors.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Show accountability toggle if not already urgent */}
-        {daysLeft > 30 && !showExtension && !extensionReason && (
-          <button
-            onClick={() => setShowExtension(true)}
-            className={`text-xs ${themeConfig.mutedText} hover:underline`}
-          >
-            Unable to meet deadline? Submit an extension reason →
-          </button>
-        )}
-
-        {/* Submit for review */}
-        {isProfileSetup && approvalStage === 'pending' && (
-          <div className={`${themeConfig.cardBg} rounded-2xl border ${themeConfig.cardBorder} p-6`}>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h3 className={`font-bold ${themeConfig.headingColor}`}>Ready for Review?</h3>
-                <p className={`text-sm mt-0.5 ${themeConfig.mutedText}`}>
-                  {userProfile?.assignedSupervisorName
-                    ? `Submit your case to ${userProfile.assignedSupervisorName} when you are ready for feedback.`
-                    : 'You need a supervisor assigned by your Lecturer before you can submit.'}
-                </p>
-              </div>
-              <button
-                onClick={handleSubmitForReview}
-                disabled={submitting || !userProfile?.assignedSupervisorUid}
-                className={`${themeConfig.button} disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-xl transition-colors shadow-sm text-sm whitespace-nowrap`}
-              >
-                {submitting ? 'Submitting...' : 'Submit for Review'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Save */}
-        <div className="flex items-center gap-4 pb-8">
-          <button
-            onClick={handleSave}
-            disabled={saving || !caseNumber.trim()}
-            className={`${themeConfig.button} disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-8 py-3 rounded-xl transition-colors shadow-sm text-sm`}
-          >
-            {saving ? 'Saving...' : 'Save Progress'}
-          </button>
-          {saveMessage && (
-            <span className={`text-sm font-medium ${saveMessage.ok ? 'text-emerald-600' : 'text-red-500'}`}>
-              {saveMessage.ok ? '' : '⚠ '}{saveMessage.text}
-            </span>
-          )}
-        </div>
+        {isProfileSetup && profileSection(++n)}
       </main>
+
+      {/* Save bar */}
+      <div className="fixed bottom-0 inset-x-0 z-20 px-3 sm:px-6 pb-3 pointer-events-none">
+        <div className="card max-w-6xl mx-auto px-4 sm:px-5 py-3 flex items-center justify-between gap-4 pointer-events-auto">
+          <p className={`text-sm font-medium ${saveMessage ? (saveMessage.ok ? 'text-ok' : 'text-danger') : 'text-muted'}`} role="status">
+            {saveMessage
+              ? saveMessage.text
+              : dirty
+              ? '● Unsaved changes'
+              : isProfileSetup
+              ? 'All changes saved'
+              : 'Enter your case number to get started'}
+          </p>
+          <button onClick={handleSave} disabled={saving || !caseNumber.trim() || !dirty} className="btn-primary">
+            {saving ? 'Saving…' : 'Save progress'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -28,29 +28,56 @@ service cloud.firestore {
 
     // ── Users ────────────────────────────────────────────────────────────────
     match /users/{userId} {
+      // Fields only staff may set on a student's profile.
+      function assignmentFields() {
+        return ['assignedSupervisorUid', 'assignedSupervisorName'];
+      }
+      function deadlineFields() {
+        return ['deadline', 'deadlineSetByName'];
+      }
+
+      // Profile photos are small data URLs; cap them well under the 1 MiB
+      // document limit.
+      function photoOk() {
+        return !('photoURL' in request.resource.data)
+          || (request.resource.data.photoURL is string
+              && request.resource.data.photoURL.size() < 200000);
+      }
+
+      function isAssignedSupervisorOf() {
+        return isSupervisor() && resource.data.assignedSupervisorUid == request.auth.uid;
+      }
+
       // Everyone can read their own profile; the Lecturer can read any profile
-      // (needed for the "Manage Students" assignment panel). Supervisors don't
-      // need to read other profiles — case records carry the student info
-      // they need as a denormalized copy.
-      allow get: if isAuthed() && (request.auth.uid == userId || isLecturer());
-      allow list: if isLecturer();
+      // (for the student roster). A Supervisor can read the profiles of the
+      // students assigned to them — to see and set their deadlines.
+      allow get: if isAuthed() && (request.auth.uid == userId || isLecturer() || isAssignedSupervisorOf());
+      allow list: if isLecturer() || isAssignedSupervisorOf();
 
-      // Clients may only self-register as a student. Supervisor and Lecturer
-      // accounts are created server-side (via the Admin SDK, which bypasses
-      // these rules) after verifying an invite code — see /api/supervisor-signup.
+      // Clients may only self-register as a student, and can't pre-fill staff
+      // fields. Supervisor and Lecturer accounts are created server-side (via
+      // the Admin SDK, which bypasses these rules) after verifying an invite
+      // code — see /api/supervisor-signup.
       allow create: if request.auth.uid == userId
-        && request.resource.data.role == 'student';
+        && request.resource.data.role == 'student'
+        && !request.resource.data.keys().hasAny(assignmentFields().concat(deadlineFields()))
+        && photoOk();
 
-      // Users can update their own profile but cannot change their role or
-      // self-assign a supervisor. The Lecturer may update only the assignment
-      // fields on any user's profile.
+      // Users can update their own profile but cannot change their role,
+      // self-assign a supervisor or move their own deadline. The Lecturer may
+      // update the assignment and deadline fields on any profile; a
+      // Supervisor only the deadline of a student assigned to them.
       allow update: if
         (request.auth.uid == userId
           && !request.resource.data.diff(resource.data).affectedKeys()
-               .hasAny(['role', 'assignedSupervisorUid', 'assignedSupervisorName']))
+               .hasAny(['role'].concat(assignmentFields()).concat(deadlineFields()))
+          && photoOk())
         || (isLecturer()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['assignedSupervisorUid', 'assignedSupervisorName']));
+               .hasOnly(assignmentFields().concat(deadlineFields())))
+        || (isAssignedSupervisorOf()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(deadlineFields()));
     }
 
     // ── Cases ────────────────────────────────────────────────────────────────
@@ -72,11 +99,14 @@ service cloud.firestore {
       allow create: if isStudent()
         && request.resource.data.studentUid == request.auth.uid
         && request.resource.data.greenLight == false
+        && !('customDeadline' in request.resource.data)
         && assignedSupervisorMatches();
 
-      // Privileged fields that students can never modify
+      // Privileged fields that students can never modify. customDeadline is a
+      // legacy student-set deadline; deadlines are now set by staff on the
+      // student's profile, so it's frozen here.
       function protectedCaseFields() {
-        return ['greenLight', 'supervisorApproval', 'lecturerApproval', 'supervisorUid', 'supervisorName'];
+        return ['greenLight', 'supervisorApproval', 'lecturerApproval', 'supervisorUid', 'supervisorName', 'customDeadline'];
       }
 
       function studentCanUpdateCase() {

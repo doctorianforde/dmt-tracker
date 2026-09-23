@@ -10,7 +10,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "deploy:rules": "firebase deploy --only firestore:rules"
   },
   "dependencies": {
     "@fontsource/roboto": "^5.2.10",

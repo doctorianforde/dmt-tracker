@@ -11,6 +11,7 @@ import {
   orderBy,
   limit,
   serverTimestamp,
+  deleteField,
   type DocumentData,
 } from 'firebase/firestore';
 import { getSafeDb } from './firebase';
@@ -50,6 +51,7 @@ function normalizeCaseRecord(data: DocumentData): CaseRecord {
   return {
     ...data,
     updatedAt: toDate(data.updatedAt),
+    resubmittedAt: toDate(data.resubmittedAt),
     supervisorApproval: normalizeApproval(data.supervisorApproval),
     lecturerApproval: normalizeApproval(data.lecturerApproval),
   } as CaseRecord;
@@ -84,27 +86,58 @@ export async function getUsersByRole(role: UserRole): Promise<UserProfile[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// Lecturer-only: assign or reassign a student's supervisor. Keeps the case
-// record's denormalized supervisorUid/Name in sync if the student already
-// has a case on file.
+// Supervisor view: the students the Lecturer has assigned to them. The
+// where-clause mirrors the list rule in firestore.rules, which only lets a
+// supervisor read profiles that name them as the assigned supervisor.
+export async function getStudentsForSupervisor(supervisorUid: string): Promise<UserProfile[]> {
+  const db = getSafeDb();
+  const snap = await getDocs(
+    query(collection(db, 'users'), where('assignedSupervisorUid', '==', supervisorUid))
+  );
+  return snap.docs
+    .map((d) => ({ uid: d.id, ...d.data() } as UserProfile))
+    .filter((u) => u.role === 'student')
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Lecturer-only: assign, reassign or unassign (supervisor = null) a student's
+// supervisor. Keeps the case record's denormalized supervisorUid/Name in sync
+// if the student already has a case on file.
 export async function assignSupervisor(
   studentUid: string,
-  supervisorUid: string,
-  supervisorName: string,
+  supervisor: { uid: string; name: string } | null,
   caseNumber?: string
 ): Promise<void> {
   const db = getSafeDb();
-  await updateUserProfile(studentUid, {
-    assignedSupervisorUid: supervisorUid,
-    assignedSupervisorName: supervisorName,
+  const fields = supervisor
+    ? { uid: supervisor.uid, name: supervisor.name }
+    : { uid: deleteField(), name: deleteField() };
+  await updateDoc(doc(db, 'users', studentUid), {
+    assignedSupervisorUid: fields.uid,
+    assignedSupervisorName: fields.name,
   });
   if (caseNumber) {
     await updateDoc(doc(db, 'cases', caseNumber), {
-      supervisorUid,
-      supervisorName,
+      supervisorUid: fields.uid,
+      supervisorName: fields.name,
       updatedAt: serverTimestamp(),
     });
   }
+}
+
+// Lecturer or the assigned Supervisor: set (or clear, with null) a student's
+// submission deadline. Stored on the student's profile so it can be set
+// before the student has created a case.
+export async function setStudentDeadline(
+  studentUid: string,
+  deadline: string | null,
+  setByName: string
+): Promise<void> {
+  const db = getSafeDb();
+  await updateDoc(doc(db, 'users', studentUid), {
+    deadline: deadline ?? deleteField(),
+    deadlineSetByName: deadline ? setByName : deleteField(),
+  });
 }
 
 // ── Case Records ────────────────────────────────────────────────────────────
@@ -132,6 +165,16 @@ export async function submitCaseForReview(caseNumber: string): Promise<void> {
   const db = getSafeDb();
   await updateDoc(doc(db, 'cases', caseNumber), {
     approvalStage: 'supervisor',
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// Student: after a rejection, flag the case as ready for the same reviewer to
+// look at again. The reviewer's rejection stays on record until they act.
+export async function resubmitCase(caseNumber: string): Promise<void> {
+  const db = getSafeDb();
+  await updateDoc(doc(db, 'cases', caseNumber), {
+    resubmittedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
 }

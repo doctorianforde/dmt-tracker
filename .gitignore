@@ -3,3 +3,8 @@ node_modules/
 .next/
 
 *.tsbuildinfo
+
+# Firebase CLI
+.firebase/
+firebase-debug.log
+firestore-debug.log

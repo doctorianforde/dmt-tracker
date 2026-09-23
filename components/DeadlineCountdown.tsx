@@ -1,81 +1,60 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useTheme } from '@/contexts/ThemeContext';
-import { DEFAULT_DEADLINE } from '@/lib/config';
-
-const DEFAULT_DEADLINE_DATE = new Date(`${DEFAULT_DEADLINE}T23:59:59`);
+import { useEffect, useState } from 'react';
+import { daysUntil, deadlineUrgency, describeDaysLeft, formatDeadline } from '@/lib/deadlines';
+import { URGENCY_STYLES } from '@/components/DeadlineCalendar';
 
 interface Props {
-  customDeadline?: string;   // ISO date string e.g. "2026-06-30"
-  completionPercent?: number; // 0–100 (for tracking progress)
+  deadline?: string; // YYYY-MM-DD, set by the student's Lecturer or Supervisor
+  setByName?: string;
+  completionPercent?: number;
 }
 
-function getDaysUntilDeadline(customDeadline: string | undefined, now: number) {
-  const deadline = customDeadline ? new Date(customDeadline + 'T23:59:59') : DEFAULT_DEADLINE_DATE;
-  const diff = deadline.getTime() - now;
-  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-  let urgency: 'critical' | 'warning' | 'ok' = 'ok';
-  if (days <= 14) urgency = 'critical';
-  else if (days <= 60) urgency = 'warning';
-  return { days, urgency, deadline };
-}
+const URGENCY_NOTE = {
+  overdue: 'Your deadline has passed — talk to your supervisor.',
+  critical: 'Final stretch. Prioritise what’s left.',
+  warning: 'Keep up the pace to finish on time.',
+  ok: 'Plenty of runway — steady progress wins.',
+} as const;
 
-export default function DeadlineCountdown({ customDeadline, completionPercent = 0 }: Props) {
-  const { activeQuote } = useTheme();
+export default function DeadlineCountdown({ deadline, setByName, completionPercent = 0 }: Props) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000 * 60 * 60); // update every hour
+    const interval = setInterval(() => setNow(Date.now()), 1000 * 60 * 60);
     return () => clearInterval(interval);
   }, []);
 
-  const { days, urgency, deadline } = getDaysUntilDeadline(customDeadline, now);
+  if (!deadline) {
+    return (
+      <div>
+        <p className="eyebrow text-muted">Deadline</p>
+        <p className="display text-4xl text-ink mt-2">Not set yet</p>
+        <p className="text-sm text-muted mt-2 max-w-xs">
+          Your supervisor or lecturer will set your submission deadline. It’ll appear here and on the calendar.
+        </p>
+      </div>
+    );
+  }
 
-  const styles = {
-    critical: 'bg-red-50 border-red-200 text-red-900',
-    warning: 'bg-amber-50 border-amber-200 text-amber-900',
-    ok: 'bg-sky-50 border-sky-200 text-sky-900',
-  };
-
-  const dotStyles = {
-    critical: 'bg-red-400',
-    warning: 'bg-amber-400',
-    ok: 'bg-sky-400',
-  };
-
-  const deadlineLabel = deadline.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-  const urgencyNote = urgency === 'critical'
-    ? '⚠️ Deadline approaching fast!'
-    : urgency === 'warning'
-    ? '📅 Keep up the pace to meet your deadline'
-    : null;
+  const days = daysUntil(deadline, now);
+  const urgency = deadlineUrgency(days);
+  const style = URGENCY_STYLES[urgency];
 
   return (
-    <div className="space-y-2">
-      <div className={`border rounded-xl px-5 py-4 flex items-center gap-4 ${styles[urgency]}`}>
-        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${dotStyles[urgency]}`} />
-        <div className="flex-1">
-          <p className="font-semibold text-sm">Submission Deadline — {deadlineLabel}</p>
-          <p className="text-xs opacity-70 mt-0.5">
-            {days > 0 ? `${days} days remaining` : 'Deadline has passed'}
-          </p>
-          {urgencyNote && (
-            <p className="text-xs font-medium mt-1 opacity-90">{urgencyNote}</p>
-          )}
-        </div>
-        <div className="text-right hidden sm:block">
-          <p className="text-2xl font-bold leading-none">{days > 0 ? days : 0}</p>
-          <p className="text-xs opacity-60 mt-0.5">days left</p>
-        </div>
+    <div>
+      <p className="eyebrow text-muted">Deadline</p>
+      <div className="flex items-end gap-3 mt-2">
+        <p className={`display text-7xl leading-[0.85] tabular-nums ${style.text}`}>{Math.max(days, 0)}</p>
+        <p className="text-sm font-semibold text-ink pb-1">{days === 1 ? 'day' : 'days'}<br />left</p>
       </div>
-
-      {/* Random Motivational Quote */}
-      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-start gap-3">
-        <span className="text-xl flex-shrink-0 mt-0.5">💡</span>
-        <p className="text-sm text-emerald-800 font-medium italic leading-relaxed">{activeQuote}</p>
-      </div>
+      <p className="text-sm font-semibold text-ink mt-4">{formatDeadline(deadline)}</p>
+      <p className="text-xs text-muted mt-0.5">{setByName ? `Set by ${setByName}` : 'Set by your supervisor'}</p>
+      <span className={`chip mt-3 ${style.pill}`}>{describeDaysLeft(days)}</span>
+      <p className="text-sm text-muted mt-3">{URGENCY_NOTE[urgency]}</p>
+      {urgency !== 'ok' && urgency !== 'overdue' && completionPercent < 100 && (
+        <p className="text-xs text-muted mt-1">{100 - completionPercent}% of your sections still to go.</p>
+      )}
     </div>
   );
 }

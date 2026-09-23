@@ -194,7 +194,6 @@ async function createTestData() {
         greenLight: testCase.approvalStage === 'approved',
         supervisorUid: testCase.approvalStage !== 'pending' ? supervisorUidByEmail[student?.supervisorEmail] : undefined,
         supervisorName: testCase.approvalStage !== 'pending' ? supervisor?.name : undefined,
-        customDeadline: '2026-06-30',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 

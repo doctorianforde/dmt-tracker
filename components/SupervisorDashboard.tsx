@@ -1,22 +1,29 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import AuthGuard from '@/components/AuthGuard';
 import Navbar from '@/components/Navbar';
-import CaseTable from '@/components/CaseTable';
+import CaseTable, { canApprove, stageOf } from '@/components/CaseTable';
+import DeadlineCalendar, { URGENCY_STYLES, type CalendarEvent } from '@/components/DeadlineCalendar';
+import Avatar from '@/components/ui/Avatar';
+import SectionHeader from '@/components/ui/SectionHeader';
 import {
   getAllCases,
   getCasesForSupervisor,
   getUsersByRole,
+  getStudentsForSupervisor,
   assignSupervisor,
+  setStudentDeadline,
   approveCase,
   rejectCase,
   revokeApproval,
   logAccess,
   getAccessLogs,
 } from '@/lib/firestore';
-import type { CaseRecord, ApprovalStage, UserRole, UserProfile, AccessLogEntry } from '@/types';
+import { daysUntil, deadlineUrgency, describeDaysLeft, effectiveDeadline } from '@/lib/deadlines';
+import { ACCOUNTABILITY_WINDOW_DAYS } from '@/lib/config';
+import type { CaseRecord, ApprovalStage, UserRole, UserProfile, AccessLogEntry, AccessLogAction } from '@/types';
 
 // Defined once at module scope — AuthGuard's redirect effect depends on this
 // array by reference, so recreating it on every render would retrigger the
@@ -31,134 +38,195 @@ export default function SupervisorDashboard() {
   );
 }
 
-function ManageStudents() {
-  const { userProfile } = useAuth();
-  const [students, setStudents] = useState<UserProfile[]>([]);
-  const [supervisors, setSupervisors] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [savingUid, setSavingUid] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : 'Unknown error';
+}
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+// ── Deadline editor (one per student row) ─────────────────────────────────
+
+function DeadlineCell({
+  value,
+  disabled,
+  onSave,
+}: {
+  value?: string;
+  disabled?: boolean;
+  onSave: (deadline: string | null) => Promise<boolean>;
+}) {
+  // Remounted (via key) whenever the saved value changes, so the draft always
+  // starts from the latest saved deadline.
+  const [draft, setDraft] = useState(value ?? '');
+  const [saving, setSaving] = useState(false);
+  const changed = draft !== (value ?? '');
+
+  const save = async (next: string | null) => {
+    setSaving(true);
     try {
-      const [studentList, supervisorList] = await Promise.all([
-        getUsersByRole('student'),
-        getUsersByRole('supervisor'),
-      ]);
-      setStudents(studentList);
-      setSupervisors(supervisorList);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setError('Failed to load students: ' + msg);
+      await onSave(next);
     } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const handleAssign = async (student: UserProfile, supervisorUid: string) => {
-    const supervisor = supervisors.find((s) => s.uid === supervisorUid);
-    if (!supervisor) return;
-    setSavingUid(student.uid);
-    try {
-      await assignSupervisor(student.uid, supervisor.uid, supervisor.name, student.caseNumber);
-      setStudents((prev) =>
-        prev.map((s) =>
-          s.uid === student.uid
-            ? { ...s, assignedSupervisorUid: supervisor.uid, assignedSupervisorName: supervisor.name }
-            : s
-        )
-      );
-      if (userProfile) {
-        logAccess({
-          actorUid: userProfile.uid,
-          actorName: userProfile.name,
-          actorRole: userProfile.role,
-          action: 'assign_supervisor',
-          targetId: student.uid,
-          targetLabel: `${student.name} → ${supervisor.name}`,
-        });
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setError('Failed to assign supervisor: ' + msg);
-    } finally {
-      setSavingUid(null);
+      setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-sm text-slate-400">
-        Loading students...
-      </div>
-    );
-  }
+  const days = value ? daysUntil(value) : null;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50">
-        <p className="text-sm font-semibold text-slate-700">Manage Students</p>
-        <p className="text-xs text-slate-500 mt-0.5">Assign or reassign each student to a supervisor</p>
+    <div className="flex flex-col gap-1.5 min-w-[11rem]">
+      <div className="flex items-center gap-1.5">
+        <input
+          type="date"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          disabled={disabled || saving}
+          className="input !py-1.5 !px-2.5 text-xs w-[9.5rem]"
+          aria-label="Submission deadline"
+        />
+        {changed && draft && (
+          <button onClick={() => save(draft)} disabled={saving} className="btn-primary !px-3 !py-1.5 text-xs">
+            {saving ? '…' : 'Set'}
+          </button>
+        )}
+        {changed && (
+          <button onClick={() => setDraft(value ?? '')} disabled={saving} className="btn-ghost !px-2 !py-1.5 text-xs" aria-label="Undo change">
+            ↺
+          </button>
+        )}
       </div>
-      {error && (
-        <div className="px-5 py-3 bg-red-50 border-b border-red-200 text-xs text-red-700">{error}</div>
-      )}
-      {students.length === 0 ? (
-        <div className="px-5 py-8 text-center text-sm text-slate-400">No students yet</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-100">
-                <th className="text-left px-5 py-2.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Student</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Case #</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Assigned Supervisor</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {students.map((student) => (
-                <tr key={student.uid}>
-                  <td className="px-5 py-3">
-                    <p className="font-medium text-slate-900">{student.name}</p>
-                    <p className="text-xs text-slate-400">{student.email}</p>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-500 font-mono">
-                    {student.caseNumber ?? '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={student.assignedSupervisorUid ?? ''}
-                      disabled={savingUid === student.uid}
-                      onChange={(e) => handleAssign(student, e.target.value)}
-                      className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50"
-                    >
-                      <option value="">— Unassigned —</option>
-                      {supervisors.map((s) => (
-                        <option key={s.uid} value={s.uid}>{s.name}</option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="flex items-center gap-2">
+        {value && days !== null && !changed && (
+          <span className={`chip !py-0.5 ${URGENCY_STYLES[deadlineUrgency(days)].pill}`}>{describeDaysLeft(days)}</span>
+        )}
+        {value && !changed && (
+          <button onClick={() => save(null)} disabled={saving || disabled} className="text-[11px] text-muted hover:text-danger">
+            Clear
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-const ACTION_LABELS: Record<string, string> = {
+// ── Student roster: supervisor assignment (Lecturer) and deadlines ────────
+
+function StudentRoster({
+  students,
+  supervisors,
+  casesByStudent,
+  isLecturer,
+  onAssign,
+  onSetDeadline,
+}: {
+  students: UserProfile[];
+  supervisors: UserProfile[];
+  casesByStudent: Map<string, CaseRecord>;
+  isLecturer: boolean;
+  onAssign: (student: UserProfile, supervisorUid: string) => Promise<boolean>;
+  onSetDeadline: (student: UserProfile, deadline: string | null) => Promise<boolean>;
+}) {
+  const [savingUid, setSavingUid] = useState<string | null>(null);
+
+  if (students.length === 0) {
+    return (
+      <div className="card text-center py-14 px-6">
+        <p className="display text-2xl text-ink">No students yet</p>
+        <p className="text-sm text-muted mt-1">
+          {isLecturer ? 'Students appear here once they register.' : 'Students the Lecturer assigns to you will appear here.'}
+        </p>
+      </div>
+    );
+  }
+
+  const th = 'text-left px-4 py-3 eyebrow text-muted';
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-line bg-surface2/50">
+              <th className={`${th} pl-5`}>Student</th>
+              <th className={th}>Case #</th>
+              {isLecturer && <th className={th}>Supervisor</th>}
+              <th className={th}>Deadline</th>
+              <th className={th}>Extension request</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {students.map((student) => {
+              const rec = casesByStudent.get(student.uid);
+              const deadline = effectiveDeadline(student, rec);
+              return (
+                <tr key={student.uid} className="align-top">
+                  <td className="pl-5 pr-4 py-4">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={student.name} photoURL={student.photoURL || undefined} size={36} />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-ink truncate">{student.name}</p>
+                        <p className="text-xs text-muted truncate">{student.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-xs text-muted font-mono whitespace-nowrap">{student.caseNumber ?? '—'}</td>
+                  {isLecturer && (
+                    <td className="px-4 py-4">
+                      <select
+                        value={student.assignedSupervisorUid ?? ''}
+                        disabled={savingUid === student.uid}
+                        onChange={async (e) => {
+                          setSavingUid(student.uid);
+                          await onAssign(student, e.target.value);
+                          setSavingUid(null);
+                        }}
+                        className="input !py-1.5 !px-2.5 text-xs min-w-[10rem]"
+                        aria-label={`Supervisor for ${student.name}`}
+                      >
+                        <option value="">— Unassigned —</option>
+                        {supervisors.map((s) => (
+                          <option key={s.uid} value={s.uid}>{s.name}</option>
+                        ))}
+                      </select>
+                    </td>
+                  )}
+                  <td className="px-4 py-4">
+                    <DeadlineCell
+                      key={deadline ?? 'none'}
+                      value={deadline}
+                      onSave={(d) => onSetDeadline(student, d)}
+                    />
+                    {!student.deadline && rec?.customDeadline && (
+                      <p className="text-[11px] text-muted mt-1 max-w-[12rem]">Set by the student before deadlines moved to staff — set it here to confirm.</p>
+                    )}
+                    {student.deadline && student.deadlineSetByName && (
+                      <p className="text-[11px] text-muted mt-1">by {student.deadlineSetByName}</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 max-w-[16rem]">
+                    {rec?.extensionReason ? (
+                      <p className="text-xs text-ink/80 line-clamp-3" title={rec.extensionReason}>“{rec.extensionReason}”</p>
+                    ) : (
+                      <span className="text-xs text-muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Access log (Lecturer) ─────────────────────────────────────────────────
+
+const ACTION_LABELS: Record<AccessLogAction, string> = {
   login: 'Signed in',
   view_cases: 'Viewed case list',
   approve: 'Approved case',
   reject: 'Rejected case',
   revoke: 'Revoked approval',
   assign_supervisor: 'Assigned supervisor',
+  set_deadline: 'Set deadline',
 };
 
 function AccessLog() {
@@ -172,8 +240,7 @@ function AccessLog() {
     try {
       setLogs(await getAccessLogs());
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setError('Failed to load access log: ' + msg);
+      setError('Failed to load access log: ' + errorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -181,51 +248,42 @@ function AccessLog() {
 
   useEffect(() => { load(); }, [load]);
 
+  const th = 'text-left px-4 py-3 eyebrow text-muted';
+
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold text-slate-700">Access Log</p>
-          <p className="text-xs text-slate-500 mt-0.5">Who accessed what, and when — logins, case views, and approval actions</p>
-        </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="text-xs text-slate-500 hover:text-slate-900 px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-white disabled:opacity-50"
-        >
-          Refresh
-        </button>
+    <div className="card overflow-hidden">
+      <div className="px-5 py-3 border-b border-line flex items-center justify-between">
+        <p className="text-sm text-muted">Logins, case views, approvals and deadline changes</p>
+        <button onClick={load} disabled={loading} className="btn-secondary !px-3 !py-1.5 text-xs">Refresh</button>
       </div>
-      {error && (
-        <div className="px-5 py-3 bg-red-50 border-b border-red-200 text-xs text-red-700">{error}</div>
-      )}
+      {error && <div className="px-5 py-3 bg-danger/10 text-xs text-danger">{error}</div>}
       {loading ? (
-        <div className="px-5 py-8 text-center text-sm text-slate-400">Loading...</div>
+        <div className="px-5 py-8 text-center text-sm text-muted">Loading…</div>
       ) : logs.length === 0 ? (
-        <div className="px-5 py-8 text-center text-sm text-slate-400">No activity recorded yet</div>
+        <div className="px-5 py-8 text-center text-sm text-muted">No activity recorded yet</div>
       ) : (
         <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-slate-50">
-              <tr className="border-b border-slate-100">
-                <th className="text-left px-5 py-2.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Time</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Who</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Action</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Target</th>
+            <thead className="sticky top-0 bg-surface">
+              <tr className="border-b border-line">
+                <th className={`${th} pl-5`}>Time</th>
+                <th className={th}>Who</th>
+                <th className={th}>Action</th>
+                <th className={th}>Target</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line">
               {logs.map((log) => (
                 <tr key={log.id}>
-                  <td className="px-5 py-2.5 text-xs text-slate-500 whitespace-nowrap">
+                  <td className="pl-5 pr-4 py-2.5 text-xs text-muted whitespace-nowrap">
                     {log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}
                   </td>
                   <td className="px-4 py-2.5">
-                    <p className="text-slate-900">{log.actorName}</p>
-                    <p className="text-xs text-slate-400 capitalize">{log.actorRole}</p>
+                    <p className="text-ink">{log.actorName}</p>
+                    <p className="text-xs text-muted capitalize">{log.actorRole}</p>
                   </td>
-                  <td className="px-4 py-2.5 text-slate-700">{ACTION_LABELS[log.action] ?? log.action}</td>
-                  <td className="px-4 py-2.5 text-xs text-slate-500">{log.targetLabel ?? '—'}</td>
+                  <td className="px-4 py-2.5 text-ink/80">{ACTION_LABELS[log.action] ?? log.action}</td>
+                  <td className="px-4 py-2.5 text-xs text-muted">{log.targetLabel ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -236,231 +294,361 @@ function AccessLog() {
   );
 }
 
+// ── Dashboard ─────────────────────────────────────────────────────────────
+
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+}
+
 function Dashboard() {
   const { userProfile } = useAuth();
   const [cases, setCases] = useState<CaseRecord[]>([]);
+  const [students, setStudents] = useState<UserProfile[]>([]);
+  const [supervisors, setSupervisors] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   const isLecturer = userProfile?.role === 'lecturer';
   const isSupervisor = userProfile?.role === 'supervisor';
 
-  const loadCases = useCallback(async () => {
-    if (!userProfile) return;
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const data = isLecturer
-        ? await getAllCases()
-        : await getCasesForSupervisor(userProfile.uid);
-      const sorted = data.sort((a, b) => a.studentName.localeCompare(b.studentName));
-      setCases(sorted);
-      setLastRefresh(new Date());
-      if (sorted.length > 0) {
-        logAccess({
-          actorUid: userProfile.uid,
-          actorName: userProfile.name,
-          actorRole: userProfile.role,
-          action: 'view_cases',
-          targetLabel: sorted.map((c) => c.caseNumber).join(', '),
-        });
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setLoadError('Failed to load cases: ' + msg);
-    } finally {
-      setLoading(false);
-    }
+  const log = useCallback(
+    (action: AccessLogAction, targetId?: string, targetLabel?: string) => {
+      if (!userProfile) return;
+      logAccess({
+        actorUid: userProfile.uid,
+        actorName: userProfile.name,
+        actorRole: userProfile.role,
+        action,
+        ...(targetId ? { targetId } : {}),
+        ...(targetLabel ? { targetLabel } : {}),
+      });
+    },
+    [userProfile]
+  );
+
+  // Cases and the roster load independently so one failing doesn't hide
+  // the other.
+  const fetchAll = useCallback(async () => {
+    if (!userProfile) return null;
+    return Promise.allSettled([
+      isLecturer ? getAllCases() : getCasesForSupervisor(userProfile.uid),
+      isLecturer ? getUsersByRole('student') : getStudentsForSupervisor(userProfile.uid),
+      isLecturer ? getUsersByRole('supervisor') : Promise.resolve([] as UserProfile[]),
+    ] as const);
   }, [userProfile, isLecturer]);
 
-  useEffect(() => { loadCases(); }, [loadCases]);
+  const applyResults = useCallback(
+    (results: Awaited<ReturnType<typeof fetchAll>>) => {
+      if (!results) return;
+      const [caseResult, studentResult, supervisorResult] = results;
+      const errors: string[] = [];
+      if (caseResult.status === 'fulfilled') {
+        const sorted = [...caseResult.value].sort((a, b) => a.studentName.localeCompare(b.studentName));
+        setCases(sorted);
+        if (sorted.length > 0) log('view_cases', undefined, sorted.map((c) => c.caseNumber).join(', '));
+      } else {
+        errors.push('cases: ' + errorMessage(caseResult.reason));
+      }
+      if (studentResult.status === 'fulfilled') setStudents(studentResult.value);
+      else errors.push('students: ' + errorMessage(studentResult.reason));
+      if (supervisorResult.status === 'fulfilled') setSupervisors(supervisorResult.value);
+      else errors.push('supervisors: ' + errorMessage(supervisorResult.reason));
 
-  const logCaseAction = (action: 'approve' | 'reject' | 'revoke', caseNumber: string) => {
-    if (!userProfile) return;
-    const studentName = cases.find((c) => c.caseNumber === caseNumber)?.studentName;
-    logAccess({
-      actorUid: userProfile.uid,
-      actorName: userProfile.name,
-      actorRole: userProfile.role,
-      action,
-      targetId: caseNumber,
-      targetLabel: studentName ? `${studentName} (${caseNumber})` : caseNumber,
+      setLoadError(errors.length ? `Failed to load ${errors.join('; ')}` : null);
+      setLastRefresh(new Date());
+      setLoading(false);
+    },
+    [log]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAll().then((results) => {
+      if (!cancelled) applyResults(results);
     });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchAll, applyResults]);
+
+  const refresh = () => {
+    setLoading(true);
+    fetchAll().then(applyResults);
   };
 
-  const handleApprove = async (
-    caseNumber: string,
-    role: 'supervisor' | 'lecturer',
-    nextStage: ApprovalStage
-  ) => {
-    await approveCase(caseNumber, role, nextStage);
-    setCases((prev) =>
-      prev.map((c) =>
-        c.caseNumber === caseNumber
-          ? {
-              ...c,
-              approvalStage: nextStage,
-              greenLight: nextStage === 'approved',
-              [role === 'supervisor' ? 'supervisorApproval' : 'lecturerApproval']: { approved: true },
-            }
-          : c
-      )
-    );
-    logCaseAction('approve', caseNumber);
+
+  const casesByStudent = useMemo(() => new Map(cases.map((c) => [c.studentUid, c])), [cases]);
+
+  const deadlines = useMemo(() => {
+    const map: Record<string, string | undefined> = {};
+    for (const s of students) map[s.uid] = effectiveDeadline(s, casesByStudent.get(s.uid));
+    return map;
+  }, [students, casesByStudent]);
+
+  const calendarEvents: CalendarEvent[] = useMemo(
+    () =>
+      students.flatMap((s) => {
+        const date = deadlines[s.uid];
+        if (!date) return [];
+        return [{
+          id: s.uid,
+          date,
+          label: s.name,
+          sublabel: isLecturer ? s.assignedSupervisorName ?? 'Unassigned' : s.caseNumber,
+          photoURL: s.photoURL || undefined,
+        }];
+      }),
+    [students, deadlines, isLecturer]
+  );
+
+  // Wraps a staff action: surfaces failures in a banner instead of letting
+  // them fail silently, and reports success back to the caller.
+  const attempt = async (what: string, action: () => Promise<void>): Promise<boolean> => {
+    setActionError(null);
+    try {
+      await action();
+      return true;
+    } catch (err: unknown) {
+      setActionError(`Couldn’t ${what}: ${errorMessage(err)}`);
+      return false;
+    }
   };
 
-  const handleReject = async (
-    caseNumber: string,
-    role: 'supervisor' | 'lecturer',
-    reason: string
-  ) => {
-    await rejectCase(caseNumber, role, reason);
-    setCases((prev) =>
-      prev.map((c) =>
-        c.caseNumber === caseNumber
-          ? {
-              ...c,
-              [role === 'supervisor' ? 'supervisorApproval' : 'lecturerApproval']: { approved: false, rejectionReason: reason },
-            }
-          : c
-      )
-    );
-    logCaseAction('reject', caseNumber);
+  const caseLabel = (caseNumber: string) => {
+    const studentName = cases.find((c) => c.caseNumber === caseNumber)?.studentName;
+    return studentName ? `${studentName} (${caseNumber})` : caseNumber;
   };
 
-  const handleRevoke = async (caseNumber: string) => {
-    await revokeApproval(caseNumber);
-    setCases((prev) =>
-      prev.map((c) => (c.caseNumber === caseNumber ? { ...c, greenLight: false, approvalStage: 'lecturer' } : c))
-    );
-    logCaseAction('revoke', caseNumber);
-  };
+  const handleApprove = (caseNumber: string, role: 'supervisor' | 'lecturer', nextStage: ApprovalStage) =>
+    attempt('approve this case', async () => {
+      await approveCase(caseNumber, role, nextStage);
+      setCases((prev) =>
+        prev.map((c) =>
+          c.caseNumber === caseNumber
+            ? {
+                ...c,
+                approvalStage: nextStage,
+                greenLight: nextStage === 'approved',
+                [role === 'supervisor' ? 'supervisorApproval' : 'lecturerApproval']: { approved: true, approvedAt: new Date() },
+              }
+            : c
+        )
+      );
+      log('approve', caseNumber, caseLabel(caseNumber));
+    });
 
-  const ROLE_TITLE: Record<string, string> = {
-    supervisor: 'Supervisor',
-    lecturer: 'Lecturer',
-  };
+  const handleReject = (caseNumber: string, role: 'supervisor' | 'lecturer', reason: string) =>
+    attempt('reject this case', async () => {
+      await rejectCase(caseNumber, role, reason);
+      setCases((prev) =>
+        prev.map((c) =>
+          c.caseNumber === caseNumber
+            ? {
+                ...c,
+                [role === 'supervisor' ? 'supervisorApproval' : 'lecturerApproval']: {
+                  approved: false,
+                  rejectionReason: reason,
+                  rejectedAt: new Date(),
+                },
+              }
+            : c
+        )
+      );
+      log('reject', caseNumber, caseLabel(caseNumber));
+    });
+
+  const handleRevoke = (caseNumber: string) =>
+    attempt('revoke approval', async () => {
+      await revokeApproval(caseNumber);
+      setCases((prev) =>
+        prev.map((c) => (c.caseNumber === caseNumber ? { ...c, greenLight: false, approvalStage: 'lecturer' } : c))
+      );
+      log('revoke', caseNumber, caseLabel(caseNumber));
+    });
+
+  const handleAssign = (student: UserProfile, supervisorUid: string) =>
+    attempt(`update ${student.name}’s supervisor`, async () => {
+      const supervisor = supervisors.find((s) => s.uid === supervisorUid) ?? null;
+      await assignSupervisor(student.uid, supervisor ? { uid: supervisor.uid, name: supervisor.name } : null, student.caseNumber);
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.uid === student.uid
+            ? { ...s, assignedSupervisorUid: supervisor?.uid, assignedSupervisorName: supervisor?.name }
+            : s
+        )
+      );
+      if (student.caseNumber) {
+        setCases((prev) =>
+          prev.map((c) =>
+            c.caseNumber === student.caseNumber
+              ? { ...c, supervisorUid: supervisor?.uid, supervisorName: supervisor?.name }
+              : c
+          )
+        );
+      }
+      log('assign_supervisor', student.uid, `${student.name} → ${supervisor?.name ?? 'unassigned'}`);
+    });
+
+  const handleSetDeadline = (student: UserProfile, deadline: string | null) =>
+    attempt(`set ${student.name}’s deadline`, async () => {
+      if (!userProfile) return;
+      await setStudentDeadline(student.uid, deadline, userProfile.name);
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.uid === student.uid
+            ? { ...s, deadline: deadline ?? undefined, deadlineSetByName: deadline ? userProfile.name : undefined }
+            : s
+        )
+      );
+      log('set_deadline', student.uid, `${student.name}: ${deadline ?? 'cleared'}`);
+    });
+
+  // ── Stats ──
+  const awaitingYou = cases.filter((c) => canApprove(stageOf(c), isSupervisor, isLecturer, c)).length;
+  const approvedCount = cases.filter((c) => stageOf(c) === 'approved').length;
+  const dueSoon = Object.values(deadlines).filter((d) => {
+    if (!d) return false;
+    const days = daysUntil(d);
+    return days >= 0 && days <= ACCOUNTABILITY_WINDOW_DAYS;
+  }).length;
+  const overdue = Object.values(deadlines).filter((d) => d && daysUntil(d) < 0).length;
+
+  const stats = [
+    { label: isLecturer ? 'Students' : 'Your students', value: students.length, tone: 'text-ink' },
+    { label: 'Awaiting your review', value: awaitingYou, tone: awaitingYou ? 'text-accent' : 'text-ink' },
+    { label: `Due in ${ACCOUNTABILITY_WINDOW_DAYS} days`, value: dueSoon, tone: dueSoon ? 'text-warn' : 'text-ink' },
+    { label: overdue ? 'Overdue' : 'Approved', value: overdue || approvedCount, tone: overdue ? 'text-danger' : 'text-ok' },
+  ];
+
+  const displayName = userProfile?.name ?? '';
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen pb-16">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              {isLecturer ? 'Lecturer Dashboard' : 'Supervisor Dashboard'}
-            </h1>
-            <p className="text-slate-500 text-sm mt-1">
-              {ROLE_TITLE[userProfile?.role ?? 'supervisor']} ·{' '}
-              {isLecturer ? 'All student case records' : 'Your assigned students'}
-            </p>
-          </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {lastRefresh && (
-              <p className="text-xs text-slate-400 hidden sm:block">
-                Updated {lastRefresh.toLocaleTimeString()}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 sm:pt-14 space-y-14">
+
+        <header>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="eyebrow text-on-canvas-muted">
+                {isLecturer ? 'Lecturer · All students' : 'Supervisor · Your assigned students'}
               </p>
-            )}
-            <button
-              onClick={loadCases}
-              disabled={loading}
-              className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 px-4 py-2 border border-slate-200 rounded-xl hover:bg-white transition-colors bg-white/50 disabled:opacity-50"
-            >
-              <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {/* Role info banners */}
-        {isLecturer && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3.5 space-y-2">
-            <div className="flex items-start gap-3">
-              <span className="text-emerald-600 text-lg">✅</span>
-              <div>
-                <p className="text-sm font-semibold text-emerald-800">Lecturer</p>
-                <p className="text-sm text-emerald-700 mt-0.5">
-                  You provide final approval for all case reports, and assign each student to a supervisor below.
-                </p>
-              </div>
+              <h1 className="display text-5xl sm:text-6xl leading-[0.95] text-on-canvas on-canvas-text mt-3">
+                {greeting()}, {displayName}.
+              </h1>
+            </div>
+            <div className="flex items-center gap-3">
+              {lastRefresh && (
+                <p className="text-xs text-on-canvas-muted hidden sm:block">Updated {lastRefresh.toLocaleTimeString()}</p>
+              )}
+              <button onClick={refresh} disabled={loading} className="btn-secondary">
+                <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
             </div>
           </div>
-        )}
-        {isSupervisor && (
-          <div className="bg-violet-50 border border-violet-100 rounded-xl px-5 py-3.5 space-y-2">
-            <div className="flex items-start gap-3">
-              <span className="text-violet-600 text-lg">👨‍⚕️</span>
-              <div>
-                <p className="text-sm font-semibold text-violet-900">Supervisor Review Panel</p>
-                <p className="text-sm text-violet-700 mt-0.5">
-                  You review case submissions for students assigned to you by the Lecturer.
-                </p>
-                <ul className="text-sm text-violet-700 mt-2 ml-4 space-y-1 list-disc">
-                  <li>Review assigned case completeness and quality</li>
-                  <li>Approve cases to move them forward in the pipeline</li>
-                  <li>Provide feedback for improvements when needed</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {isLecturer && <ManageStudents />}
-        {isLecturer && <AccessLog />}
-
-        {/* Approval stage legend */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Approval Pipeline</p>
-          <div className="space-y-2">
-            {[
-              { color: 'bg-slate-300', label: 'Pending', desc: 'Awaiting submission & Supervisor review' },
-              { color: 'bg-orange-400', label: 'Supervisor', desc: 'Awaiting the assigned Supervisor’s approval' },
-              { color: 'bg-yellow-300', label: 'Lecturer', desc: 'Supervisor approved, awaiting the Lecturer' },
-              { color: 'bg-emerald-500', label: 'Approved', desc: 'Final approval granted by the Lecturer' },
-            ].map(({ color, label, desc }) => (
-              <div key={label} className="flex items-start gap-2">
-                <span className={`w-3 h-3 rounded-full ${color} flex-shrink-0 mt-1`} />
-                <div>
-                  <p className="text-xs font-semibold text-slate-700">{label}</p>
-                  <p className="text-xs text-slate-500">{desc}</p>
-                </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-8">
+            {stats.map((s) => (
+              <div key={s.label} className="card p-5">
+                <p className={`display text-5xl leading-none tabular-nums ${s.tone}`}>{s.value}</p>
+                <p className="text-xs font-semibold text-muted mt-2">{s.label}</p>
               </div>
             ))}
           </div>
-        </div>
+        </header>
 
-        {loadError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center">
-            <p className="text-sm font-semibold text-red-700">{loadError}</p>
-            <button
-              onClick={loadCases}
-              className="mt-3 px-4 py-2 bg-white border border-red-200 text-red-700 text-sm font-medium rounded-lg hover:bg-red-100"
-            >
-              Retry
-            </button>
+        {(loadError || actionError) && (
+          <div className="card p-4 border-danger/40 flex items-start justify-between gap-4" role="alert">
+            <p className="text-sm font-semibold text-danger">{actionError ?? loadError}</p>
+            {actionError ? (
+              <button onClick={() => setActionError(null)} className="btn-ghost !px-2 !py-1 text-xs">Dismiss</button>
+            ) : (
+              <button onClick={refresh} className="btn-secondary !px-3 !py-1.5 text-xs">Retry</button>
+            )}
           </div>
         )}
 
-        {loading ? (
+        {loading && cases.length === 0 && students.length === 0 ? (
           <div className="flex items-center justify-center h-64">
             <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-slate-400 text-sm">Loading case records...</p>
+              <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+              <p className="text-on-canvas-muted text-sm">Loading…</p>
             </div>
           </div>
         ) : (
-          <CaseTable
-            cases={cases}
-            isLecturer={isLecturer}
-            isSupervisor={isSupervisor}
-            onApprove={handleApprove}
-            onReject={handleReject}
-            onRevoke={handleRevoke}
-          />
+          <>
+            <section>
+              <SectionHeader
+                index={1}
+                eyebrow="Review"
+                title="Case reviews"
+                description={
+                  isLecturer
+                    ? 'Grant final approval once the assigned supervisor has approved.'
+                    : 'Approve to send a case on to the Lecturer, or request changes.'
+                }
+              />
+              <CaseTable
+                cases={cases}
+                isLecturer={isLecturer}
+                isSupervisor={isSupervisor}
+                deadlines={deadlines}
+                onApprove={handleApprove}
+                onReject={handleReject}
+                onRevoke={handleRevoke}
+              />
+            </section>
+
+            <section>
+              <SectionHeader
+                index={2}
+                eyebrow="Timeline"
+                title="Deadline calendar"
+                description={isLecturer ? 'Every student’s submission deadline.' : 'Submission deadlines for your students.'}
+              />
+              <div className="card p-6 sm:p-8">
+                <DeadlineCalendar
+                  events={calendarEvents}
+                  emptyMessage="No upcoming deadlines. Set them in the student list below."
+                />
+              </div>
+            </section>
+
+            <section>
+              <SectionHeader
+                index={3}
+                eyebrow="Students"
+                title={isLecturer ? 'Students & supervisors' : 'Your students'}
+                description={
+                  isLecturer
+                    ? 'Assign each student a supervisor and set their submission deadline.'
+                    : 'Set a submission deadline for each of your students.'
+                }
+              />
+              <StudentRoster
+                students={students}
+                supervisors={supervisors}
+                casesByStudent={casesByStudent}
+                isLecturer={isLecturer}
+                onAssign={handleAssign}
+                onSetDeadline={handleSetDeadline}
+              />
+            </section>
+
+            {isLecturer && (
+              <section>
+                <SectionHeader index={4} eyebrow="Audit" title="Access log" />
+                <AccessLog />
+              </section>
+            )}
+          </>
         )}
       </main>
     </div>

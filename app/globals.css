@@ -1,19 +1,360 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #f8fafc;
+/* ── Theme tokens ───────────────────────────────────────────────────────────
+   Colours are space-separated RGB triplets so Tailwind can apply opacity
+   (e.g. bg-accent/10). The font variables come from next/font in
+   app/layout.tsx. Every theme defines the full set.                        */
+
+:root,
+[data-theme='light'] {
+  --c-canvas: 246 244 239;
+  --c-on-canvas: 22 22 26;
+  --c-on-canvas-muted: 107 104 98;
+  --c-surface: 255 255 255;
+  --c-surface2: 240 237 230;
+  --c-ink: 22 22 26;
+  --c-muted: 107 104 98;
+  --c-line: 226 222 212;
+  --c-accent: 59 91 253;
+  --c-on-accent: 255 255 255;
+  --c-accent-soft: 229 234 255;
+  --c-ok: 22 150 72;
+  --c-warn: 222 98 14;
+  --c-gold: 190 130 0;
+  --c-danger: 214 40 40;
+  --c-info: 37 99 235;
+
+  --font-body: var(--font-jakarta);
+  --font-display: var(--font-bricolage);
+  --display-weight: 700;
+  --display-tracking: -0.03em;
+  --display-transform: none;
+  --display-style: normal;
+
+  --radius-card: 20px;
+  --radius-control: 12px;
+  --card-border-width: 1px;
+  --card-shadow: 0 1px 2px rgb(22 22 26 / 0.04), 0 12px 32px -18px rgb(22 22 26 / 0.18);
+  --control-shadow: none;
+  --canvas-image:
+    radial-gradient(rgb(22 22 26 / 0.07) 1px, transparent 1px);
+  --canvas-size: 22px 22px;
 }
 
-* {
-  box-sizing: border-box;
+[data-theme='flower'] {
+  --c-canvas: 255 238 242;
+  --c-on-canvas: 74 21 45;
+  --c-on-canvas-muted: 150 92 115;
+  --c-surface: 255 255 255;
+  --c-surface2: 255 232 238;
+  --c-ink: 74 21 45;
+  --c-muted: 150 92 115;
+  --c-line: 250 209 222;
+  --c-accent: 224 69 123;
+  --c-on-accent: 255 255 255;
+  --c-accent-soft: 255 225 235;
+  --c-ok: 21 140 90;
+  --c-warn: 214 96 40;
+  --c-gold: 184 120 20;
+  --c-danger: 200 30 60;
+  --c-info: 150 70 200;
+
+  --font-display: var(--font-fraunces);
+  --display-weight: 600;
+  --display-tracking: -0.02em;
+  --display-style: italic;
+
+  --radius-card: 28px;
+  --radius-control: 999px;
+  --card-shadow: 0 20px 40px -24px rgb(224 69 123 / 0.35);
+  --canvas-image:
+    radial-gradient(circle at 12% 18%, rgb(255 190 205 / 0.9) 0, transparent 34%),
+    radial-gradient(circle at 88% 8%, rgb(255 214 190 / 0.9) 0, transparent 30%),
+    radial-gradient(circle at 78% 85%, rgb(232 200 255 / 0.8) 0, transparent 36%),
+    radial-gradient(circle at 20% 90%, rgb(255 200 220 / 0.7) 0, transparent 30%);
+  --canvas-size: 100% 100%;
 }
 
-body {
-  background-color: var(--background);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  -webkit-font-smoothing: antialiased;
+[data-theme='pastel'] {
+  --c-canvas: 239 234 255;
+  --c-on-canvas: 45 38 84;
+  --c-on-canvas-muted: 110 102 152;
+  --c-surface: 255 255 255;
+  --c-surface2: 243 240 255;
+  --c-ink: 45 38 84;
+  --c-muted: 110 102 152;
+  --c-line: 226 222 250;
+  --c-accent: 124 92 255;
+  --c-on-accent: 255 255 255;
+  --c-accent-soft: 236 232 255;
+  --c-ok: 16 150 110;
+  --c-warn: 226 110 60;
+  --c-gold: 190 135 20;
+  --c-danger: 220 50 90;
+  --c-info: 50 120 230;
+
+  --font-display: var(--font-fredoka);
+  --display-weight: 600;
+  --display-tracking: -0.01em;
+
+  --radius-card: 28px;
+  --radius-control: 16px;
+  --card-shadow: 0 24px 48px -28px rgb(124 92 255 / 0.4);
+  --canvas-image:
+    radial-gradient(ellipse at 0% 0%, rgb(190 242 225) 0, transparent 45%),
+    radial-gradient(ellipse at 100% 0%, rgb(255 214 196) 0, transparent 45%),
+    radial-gradient(ellipse at 100% 100%, rgb(200 220 255) 0, transparent 50%),
+    radial-gradient(ellipse at 0% 100%, rgb(255 222 240) 0, transparent 45%);
+  --canvas-size: 100% 100%;
+}
+
+[data-theme='football'] {
+  --c-canvas: 12 58 38;
+  --c-on-canvas: 255 255 255;
+  --c-on-canvas-muted: 190 220 200;
+  --c-surface: 255 255 255;
+  --c-surface2: 240 245 238;
+  --c-ink: 13 32 22;
+  --c-muted: 84 104 92;
+  --c-line: 214 224 216;
+  --c-accent: 245 196 0;
+  --c-on-accent: 20 24 10;
+  --c-accent-soft: 255 244 200;
+  --c-ok: 20 140 70;
+  --c-warn: 220 100 10;
+  --c-gold: 180 130 0;
+  --c-danger: 210 30 40;
+  --c-info: 30 100 200;
+
+  --font-display: var(--font-bebas);
+  --display-weight: 400;
+  --display-tracking: 0.02em;
+  --display-transform: uppercase;
+
+  --radius-card: 14px;
+  --radius-control: 10px;
+  --card-border-width: 0px;
+  --card-shadow: 0 0 0 1px rgb(255 255 255 / 0.1), 0 18px 40px -16px rgb(0 0 0 / 0.55);
+  --canvas-image:
+    radial-gradient(circle at 50% -10%, rgb(255 255 255 / 0.18), transparent 45%),
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.045) 0 90px, transparent 90px 180px);
+  --canvas-size: 100% 100%;
+}
+
+[data-theme='dark'] {
+  --c-canvas: 11 12 16;
+  --c-on-canvas: 240 240 245;
+  --c-on-canvas-muted: 146 148 160;
+  --c-surface: 22 23 29;
+  --c-surface2: 31 33 41;
+  --c-ink: 240 240 245;
+  --c-muted: 146 148 160;
+  --c-line: 44 46 57;
+  --c-accent: 198 244 50;
+  --c-on-accent: 14 16 10;
+  --c-accent-soft: 42 50 20;
+  --c-ok: 74 222 128;
+  --c-warn: 251 146 60;
+  --c-gold: 250 204 21;
+  --c-danger: 248 113 113;
+  --c-info: 96 165 250;
+
+  --font-display: var(--font-space);
+  --display-weight: 600;
+  --display-tracking: -0.03em;
+
+  --radius-card: 18px;
+  --radius-control: 12px;
+  --card-shadow: 0 0 0 1px rgb(255 255 255 / 0.02), 0 20px 40px -20px rgb(0 0 0 / 0.8);
+  --canvas-image:
+    radial-gradient(ellipse at 0% 0%, rgb(198 244 50 / 0.12), transparent 45%),
+    radial-gradient(ellipse at 100% 100%, rgb(120 90 255 / 0.16), transparent 50%);
+  --canvas-size: 100% 100%;
+}
+
+[data-theme='mario'] {
+  --c-canvas: 92 148 252;
+  --c-on-canvas: 255 255 255;
+  --c-on-canvas-muted: 232 240 255;
+  --c-surface: 255 248 220;
+  --c-surface2: 248 216 112;
+  --c-ink: 20 20 20;
+  --c-muted: 96 74 44;
+  --c-line: 20 20 20;
+  --c-accent: 228 0 15;
+  --c-on-accent: 255 255 255;
+  --c-accent-soft: 255 214 200;
+  --c-ok: 0 150 50;
+  --c-warn: 220 100 0;
+  --c-gold: 170 110 0;
+  --c-danger: 200 0 20;
+  --c-info: 0 90 200;
+
+  --font-display: var(--font-pixel);
+  --display-weight: 700;
+  --display-tracking: 0;
+
+  --radius-card: 6px;
+  --radius-control: 4px;
+  --card-border-width: 3px;
+  --card-shadow: 6px 6px 0 rgb(20 20 20);
+  --control-shadow: 3px 3px 0 rgb(20 20 20);
+  /* Soft clouds along the page edges (clear of the content column), a
+     brick ground strip along the bottom. */
+  --canvas-image:
+    radial-gradient(ellipse 80px 30px at 4% 18%, rgb(255 255 255 / 0.75) 98%, transparent),
+    radial-gradient(ellipse 50px 26px at 7% 15%, rgb(255 255 255 / 0.75) 98%, transparent),
+    radial-gradient(ellipse 90px 32px at 96% 42%, rgb(255 255 255 / 0.75) 98%, transparent),
+    radial-gradient(ellipse 56px 28px at 93% 39%, rgb(255 255 255 / 0.75) 98%, transparent),
+    radial-gradient(ellipse 70px 26px at 3% 68%, rgb(255 255 255 / 0.6) 98%, transparent);
+  --canvas-size: 100% 100%;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────── */
+
+@layer base {
+  html {
+    background-color: rgb(var(--c-canvas));
+    color-scheme: light;
+  }
+  [data-theme='dark'] {
+    color-scheme: dark;
+  }
+  /* No body background: it would paint over the fixed .app-canvas backdrop
+     (html carries the base colour instead). */
+  body {
+    min-height: 100vh;
+    color: rgb(var(--c-ink));
+    font-family: var(--font-body), system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: rgb(var(--c-accent) / 0.25);
+  }
+}
+
+/* ── Components ───────────────────────────────────────────────────────── */
+
+@layer components {
+  /* The fixed themed backdrop behind every page. */
+  .app-canvas {
+    @apply fixed inset-0 -z-10 pointer-events-none;
+    background-color: rgb(var(--c-canvas));
+    background-image: var(--canvas-image);
+    background-size: var(--canvas-size);
+  }
+  [data-theme='mario'] .app-canvas::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 56px;
+    background-color: rgb(200 76 12);
+    background-image:
+      linear-gradient(rgb(20 20 20) 3px, transparent 3px),
+      linear-gradient(90deg, rgb(20 20 20) 3px, transparent 3px);
+    background-size: 56px 28px, 56px 56px;
+    border-top: 4px solid rgb(20 20 20);
+    box-shadow: inset 0 6px 0 rgb(255 170 120 / 0.6);
+  }
+  [data-theme='football'] .app-canvas::after {
+    /* Halfway line and centre circle. */
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 55%;
+    width: 360px;
+    height: 360px;
+    transform: translate(-50%, -50%);
+    border: 3px solid rgb(255 255 255 / 0.08);
+    border-radius: 999px;
+    box-shadow: 0 0 0 9999px transparent;
+  }
+
+  .display {
+    font-family: var(--font-display), var(--font-body), system-ui, sans-serif;
+    font-weight: var(--display-weight);
+    letter-spacing: var(--display-tracking);
+    text-transform: var(--display-transform);
+    font-style: var(--display-style);
+  }
+
+  .card {
+    background-color: rgb(var(--c-surface));
+    border: var(--card-border-width) solid rgb(var(--c-line));
+    border-radius: var(--radius-card);
+    box-shadow: var(--card-shadow);
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em];
+  }
+
+  .field-label {
+    @apply eyebrow mb-2 block text-muted;
+  }
+
+  .input {
+    @apply w-full px-4 py-3 text-sm text-ink placeholder:text-muted/70 transition-shadow
+      focus:outline-none focus:ring-2 focus:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-60;
+    background-color: rgb(var(--c-surface));
+    border: 1.5px solid rgb(var(--c-line));
+    border-radius: var(--radius-control);
+  }
+  [data-theme='mario'] .input {
+    border-width: 2px;
+    box-shadow: var(--control-shadow);
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold transition
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2
+      disabled:cursor-not-allowed disabled:opacity-50;
+    border-radius: var(--radius-control);
+  }
+  .btn-primary {
+    @apply btn bg-accent text-on-accent hover:brightness-95 active:translate-y-px;
+  }
+  .btn-secondary {
+    @apply btn bg-surface text-ink hover:bg-surface2;
+    border: 1.5px solid rgb(var(--c-line));
+  }
+  .btn-ghost {
+    @apply btn text-muted hover:bg-ink/5 hover:text-ink;
+  }
+  [data-theme='football'] .btn {
+    @apply uppercase tracking-wide;
+  }
+  [data-theme='mario'] .btn-primary,
+  [data-theme='mario'] .btn-secondary {
+    border: 2px solid rgb(20 20 20);
+    box-shadow: var(--control-shadow);
+  }
+  [data-theme='mario'] .btn-primary:active,
+  [data-theme='mario'] .btn-secondary:active {
+    box-shadow: none;
+    transform: translate(3px, 3px);
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+
+  /* Text sitting directly on a busy canvas (football pitch, mario sky). */
+  [data-theme='mario'] .on-canvas-text {
+    text-shadow: 3px 3px 0 rgb(20 20 20);
+  }
+  [data-theme='football'] .on-canvas-text {
+    text-shadow: 0 2px 12px rgb(0 0 0 / 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

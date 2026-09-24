@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { BrandMark } from '@/components/Navbar';
+import SiteFooter from '@/components/SiteFooter';
 
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -282,11 +283,7 @@ export default function LoginPage() {
             </div>
           </div>
           )}
-          <p className="mt-6 text-center text-xs text-on-canvas-muted">
-            <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
-            {' · '}
-            <Link href="/tos" className="hover:underline">Terms of Service</Link>
-          </p>
+          <SiteFooter />
         </div>
       </section>
     </div>

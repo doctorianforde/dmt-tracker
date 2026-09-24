@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import AuthGuard from '@/components/AuthGuard';
+import SiteFooter from '@/components/SiteFooter';
 import Navbar from '@/components/Navbar';
 import CaseTable, { canApprove, stageOf } from '@/components/CaseTable';
 import DeadlineCalendar, { URGENCY_STYLES, type CalendarEvent } from '@/components/DeadlineCalendar';
@@ -677,7 +678,7 @@ function Dashboard() {
   const displayName = userProfile?.name ?? '';
 
   return (
-    <div className="min-h-screen pb-16">
+    <div className="min-h-screen pb-6">
       <Navbar />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 sm:pt-14 space-y-14">
 
@@ -805,6 +806,7 @@ function Dashboard() {
           </>
         )}
       </main>
+      <SiteFooter />
     </div>
   );
 }

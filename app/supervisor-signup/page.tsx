@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { BrandMark } from '@/components/Navbar';
+import SiteFooter from '@/components/SiteFooter';
 
 const NOT_ON_LIST = '__not_on_list__';
 
@@ -294,6 +295,7 @@ function SignupForm() {
               </p>
             </div>
           </div>
+          <SiteFooter />
         </div>
       </section>
     </div>

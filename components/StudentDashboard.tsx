@@ -12,6 +12,7 @@ import AvatarUpload from '@/components/ui/AvatarUpload';
 import ProgressRing from '@/components/ui/ProgressRing';
 import SectionHeader from '@/components/ui/SectionHeader';
 import ChangePasswordForm from '@/components/ChangePasswordForm';
+import SiteFooter from '@/components/SiteFooter';
 import {
   getCaseRecord,
   saveCaseRecord,
@@ -586,6 +587,8 @@ function Dashboard() {
 
         {isProfileSetup && profileSection(++n)}
       </main>
+
+      <SiteFooter />
 
       {/* Save bar */}
       <div className="fixed bottom-0 inset-x-0 z-20 px-3 sm:px-6 pb-3 pointer-events-none">

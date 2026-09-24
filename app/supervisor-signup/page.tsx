@@ -1,14 +1,40 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { BrandMark } from '@/components/Navbar';
 
 const NOT_ON_LIST = '__not_on_list__';
 
+type StaffRole = 'supervisor' | 'lecturer';
+
+const ROLE_COPY: Record<StaffRole, { title: string; blurb: string; codeLabel: string }> = {
+  supervisor: {
+    title: 'Supervisor sign up',
+    blurb: 'Review your students’ case reports. You need the supervisor invite code.',
+    codeLabel: 'Supervisor invite code',
+  },
+  lecturer: {
+    title: 'Lecturer sign up',
+    blurb: 'Oversee every student, assign supervisors and give final approval. You need the lecturer invite code.',
+    codeLabel: 'Lecturer invite code',
+  },
+};
+
+// useSearchParams needs a Suspense boundary on a statically rendered page.
 export default function SupervisorSignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
+  );
+}
+
+function SignupForm() {
+  const searchParams = useSearchParams();
+  const [role, setRole] = useState<StaffRole>(searchParams.get('role') === 'lecturer' ? 'lecturer' : 'supervisor');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,11 +70,15 @@ export default function SupervisorSignupPage() {
     setName(entry ? entry.name : '');
   };
 
+  // Lecturers only need the staff list if they also supervise students.
+  const effectiveChoice = directoryChoice || (role === 'lecturer' ? NOT_ON_LIST : '');
+  const copy = ROLE_COPY[role];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!directoryChoice) {
+    if (!effectiveChoice) {
       setError('Please choose your name from the staff list, or “I’m not on this list yet”.');
       return;
     }
@@ -67,7 +97,8 @@ export default function SupervisorSignupPage() {
           email,
           password,
           code: code.trim(),
-          ...(directoryChoice !== NOT_ON_LIST ? { directoryId: directoryChoice } : {}),
+          role,
+          ...(effectiveChoice !== NOT_ON_LIST ? { directoryId: effectiveChoice } : {}),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -111,7 +142,7 @@ export default function SupervisorSignupPage() {
         </div>
 
         <p className="text-sm text-on-canvas-muted max-w-md">
-          Your role, supervisor or lecturer, is set by the invite code you enter.
+          Supervisors review their students’ cases. Lecturers oversee everyone and give final approval.
         </p>
       </section>
 
@@ -120,35 +151,62 @@ export default function SupervisorSignupPage() {
           <BrandMark className="text-on-canvas mb-8 lg:hidden" />
 
           <div className="card p-7 sm:p-9">
-            <p className="eyebrow text-muted">Supervisors & lecturers</p>
-            <h1 className="display text-4xl text-ink mt-2">Staff sign up</h1>
-            <p className="text-muted text-sm mt-2 mb-7">You need an invite code for your role.</p>
+            <p className="eyebrow text-muted">Staff accounts</p>
+            <h1 className="display text-4xl text-ink mt-2">{copy.title}</h1>
+            <p className="text-muted text-sm mt-2 mb-6">{copy.blurb}</p>
+
+            <div role="radiogroup" aria-label="I’m signing up as" className="grid grid-cols-2 gap-1 p-1 rounded-control bg-ink/5 mb-6">
+              {(['supervisor', 'lecturer'] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  role="radio"
+                  aria-checked={role === r}
+                  onClick={() => {
+                    setRole(r);
+                    setError('');
+                  }}
+                  className={`rounded-control py-2.5 text-sm font-semibold transition ${
+                    role === r ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'
+                  }`}
+                >
+                  {r === 'supervisor' ? 'Supervisor' : 'Lecturer'}
+                </button>
+              ))}
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="field-label" htmlFor="directory">Are you on our staff list?</label>
+                <label className="field-label" htmlFor="directory">
+                  {role === 'lecturer' ? 'Do you also supervise students?' : 'Are you on our staff list?'}
+                </label>
                 <select
                   id="directory"
-                  value={directoryChoice}
+                  value={effectiveChoice}
                   onChange={(e) => chooseDirectoryEntry(e.target.value)}
                   className="input"
                   disabled={staffOptions === null}
                   required
                 >
-                  <option value="" disabled>{staffOptions === null ? 'Loading staff list…' : 'Select your name…'}</option>
+                  {role === 'supervisor' && (
+                    <option value="" disabled>{staffOptions === null ? 'Loading staff list…' : 'Select your name…'}</option>
+                  )}
+                  {role === 'lecturer' && <option value={NOT_ON_LIST}>No — I don’t supervise students</option>}
                   {staffOptions?.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
+                    <option key={s.id} value={s.id}>{role === 'lecturer' ? `Yes — I’m ${s.name}` : s.name}</option>
                   ))}
-                  <option value={NOT_ON_LIST}>I’m not on this list yet</option>
+                  {role === 'supervisor' && <option value={NOT_ON_LIST}>I’m not on this list yet</option>}
                 </select>
                 <p className="text-xs text-muted mt-1.5">
-                  Students may already have chosen you as their supervisor. Picking your name links them to you.
+                  {role === 'lecturer'
+                    ? 'If you’re on the supervisor list, pick your name so students who chose you are linked to you.'
+                    : 'Students may already have chosen you as their supervisor. Picking your name links them to you.'}
                 </p>
               </div>
 
               <div>
                 <label className="field-label" htmlFor="name">
-                  {directoryChoice && directoryChoice !== NOT_ON_LIST ? 'Your name as it should appear' : 'Full name'}
+                  {effectiveChoice && effectiveChoice !== NOT_ON_LIST ? 'Your name as it should appear' : 'Full name'}
                 </label>
                 <input
                   id="name"
@@ -160,7 +218,7 @@ export default function SupervisorSignupPage() {
                   autoComplete="name"
                   required
                 />
-                {directoryChoice && directoryChoice !== NOT_ON_LIST && (
+                {effectiveChoice && effectiveChoice !== NOT_ON_LIST && (
                   <p className="text-xs text-muted mt-1.5">Edit this if you’d like it written differently, e.g. with your full first name.</p>
                 )}
               </div>
@@ -195,7 +253,7 @@ export default function SupervisorSignupPage() {
               </div>
 
               <div>
-                <label className="field-label" htmlFor="code">Invite code</label>
+                <label className="field-label" htmlFor="code">{copy.codeLabel}</label>
                 <input
                   id="code"
                   type="text"

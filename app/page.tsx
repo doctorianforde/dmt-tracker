@@ -170,9 +170,13 @@ export default function LoginPage() {
               </p>
               {!isSignUp && (
                 <p className="text-xs text-muted">
-                  Supervisor or lecturer?{' '}
+                  Staff?{' '}
                   <Link href="/supervisor-signup" className="text-accent font-semibold hover:underline">
-                    Create a staff account →
+                    Supervisor sign up
+                  </Link>
+                  {' · '}
+                  <Link href="/supervisor-signup?role=lecturer" className="text-accent font-semibold hover:underline">
+                    Lecturer sign up
                   </Link>
                 </p>
               )}

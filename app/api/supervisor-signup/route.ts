@@ -16,6 +16,8 @@ interface SupervisorSignupBody {
   // The staff-directory entry they say they are; omitted for "I'm not on
   // this list yet".
   directoryId?: string;
+  // The role they chose on the form; must match the invite code's role.
+  role?: string;
 }
 
 // The submitted invite code determines the role — the client never gets to
@@ -47,6 +49,12 @@ export async function POST(request: Request) {
   if (!role) {
     return NextResponse.json({ error: 'Incorrect invite code. Please check with your administrator.' }, { status: 403 });
   }
+  if (body?.role && body.role !== role) {
+    return NextResponse.json(
+      { error: `That isn’t the ${body.role} invite code. Check the code, or switch to ${role === 'lecturer' ? 'Lecturer' : 'Supervisor'} above.` },
+      { status: 403 }
+    );
+  }
   if (!name) {
     return NextResponse.json({ error: 'Please enter your full name.' }, { status: 400 });
   }
@@ -70,7 +78,12 @@ export async function POST(request: Request) {
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    await claimStaffEntry(db, { directoryId, uid: userRecord.uid, name, role });
+    // Supervisors always get a staff-directory entry (so students can pick
+    // them). Lecturers only if they claimed a listed name, i.e. they also
+    // supervise students.
+    if (directoryId || role === 'supervisor') {
+      await claimStaffEntry(db, { directoryId, uid: userRecord.uid, name, role });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

@@ -176,4 +176,28 @@ describe('POST /api/supervisor-signup', () => {
       expect(deleteUser).toHaveBeenCalledWith('uid-late');
     });
   });
+
+  describe('chosen role', () => {
+    it('refuses a supervisor code when Lecturer was chosen', async () => {
+      const res = await POST(makeRequest({ name: 'Dr. Paul', email: 'p@test.edu', password: 'secret1', code: 'correct-code', role: 'lecturer' }));
+      expect(res.status).toBe(403);
+      expect((await res.json()).error).toMatch(/lecturer invite code/i);
+      expect(createUser).not.toHaveBeenCalled();
+    });
+
+    it('creates a lecturer with the lecturer code, without adding them to the supervisor list', async () => {
+      createUser.mockResolvedValue({ uid: 'uid-lect' });
+      const res = await POST(makeRequest({ name: 'Dr. Paul', email: 'p@test.edu', password: 'secret1', code: 'lecturer-code', role: 'lecturer' }));
+      expect(res.status).toBe(200);
+      expect(docSet).toHaveBeenCalledWith(expect.objectContaining({ role: 'lecturer' }));
+      expect(claimStaffEntry).not.toHaveBeenCalled();
+    });
+
+    it('lets a lecturer who also supervises claim their listed name', async () => {
+      createUser.mockResolvedValue({ uid: 'uid-lect' });
+      const res = await POST(makeRequest({ name: 'Dr. Mapp', email: 'm@test.edu', password: 'secret1', code: 'lecturer-code', role: 'lecturer', directoryId: 'entry-mapp' }));
+      expect(res.status).toBe(200);
+      expect(claimStaffEntry).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ directoryId: 'entry-mapp', role: 'lecturer' }));
+    });
+  });
 });

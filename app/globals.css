@@ -291,6 +291,21 @@
     @apply text-[11px] font-semibold uppercase tracking-[0.14em];
   }
 
+  /* Long-form text on the Privacy Policy and Terms pages. */
+  .legal h2 {
+    @apply display text-2xl text-ink mt-9 mb-3;
+  }
+  .legal p,
+  .legal ul {
+    @apply mb-4;
+  }
+  .legal ul {
+    @apply list-disc pl-6 space-y-1.5;
+  }
+  .legal a {
+    @apply text-accent font-semibold hover:underline;
+  }
+
   .field-label {
     @apply eyebrow mb-2 block text-muted;
   }

@@ -272,9 +272,21 @@ export default function LoginPage() {
                   </Link>
                 </p>
               )}
+              {isSignUp && (
+                <p className="text-xs text-muted">
+                  By creating an account you agree to the{' '}
+                  <Link href="/tos" className="text-accent font-semibold hover:underline">Terms of Service</Link> and{' '}
+                  <Link href="/privacy" className="text-accent font-semibold hover:underline">Privacy Policy</Link>.
+                </p>
+              )}
             </div>
           </div>
           )}
+          <p className="mt-6 text-center text-xs text-on-canvas-muted">
+            <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+            {' · '}
+            <Link href="/tos" className="hover:underline">Terms of Service</Link>
+          </p>
         </div>
       </section>
     </div>

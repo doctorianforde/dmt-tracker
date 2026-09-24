@@ -24,6 +24,7 @@ import {
 } from '@/lib/firestore';
 import { daysUntil, deadlineUrgency, describeDaysLeft, effectiveDeadline } from '@/lib/deadlines';
 import { ACCOUNTABILITY_WINDOW_DAYS } from '@/lib/config';
+import { getUnassignedStudents, updateMyStudents, type UnassignedStudent } from '@/lib/api-client';
 import type { CaseRecord, ApprovalStage, UserRole, UserProfile, AccessLogEntry, AccessLogAction, StaffDirectoryEntry } from '@/types';
 
 // Defined once at module scope — AuthGuard's redirect effect depends on this
@@ -107,6 +108,103 @@ function DeadlineCell({
   );
 }
 
+// ── Supervisor: add students who have no supervisor yet ───────────────────
+
+function AddStudentsPanel({ onAdded }: { onAdded: (student: UnassignedStudent) => void }) {
+  const [open, setOpen] = useState(false);
+  const [students, setStudents] = useState<UnassignedStudent[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [addingUid, setAddingUid] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const load = () => {
+    setError(null);
+    setStudents(null);
+    getUnassignedStudents()
+      .then(setStudents)
+      .catch((err: unknown) => setError(errorMessage(err)));
+  };
+
+  const add = async (student: UnassignedStudent) => {
+    setAddingUid(student.uid);
+    setError(null);
+    try {
+      await updateMyStudents(student.uid, 'add');
+      setStudents((prev) => prev?.filter((s) => s.uid !== student.uid) ?? null);
+      onAdded(student);
+    } catch (err: unknown) {
+      setError(`Couldn’t add ${student.name}: ${errorMessage(err)}`);
+    } finally {
+      setAddingUid(null);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => {
+          setOpen(true);
+          load();
+        }}
+        className="btn-primary"
+      >
+        + Add students
+      </button>
+    );
+  }
+
+  const q = search.trim().toLowerCase();
+  const shown = students?.filter(
+    (s) => !q || s.name.toLowerCase().includes(q) || (s.caseNumber ?? '').toLowerCase().includes(q) || (s.email ?? '').toLowerCase().includes(q)
+  );
+
+  return (
+    <div className="card p-5 sm:p-6 mb-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <p className="font-bold text-ink">Students without a supervisor</p>
+          <p className="text-sm text-muted mt-0.5">Add a student to your list. You can remove them again until they submit their case.</p>
+        </div>
+        <button onClick={() => setOpen(false)} className="btn-ghost !px-3 !py-1.5 text-xs">Close</button>
+      </div>
+      {error && <p className="text-sm text-danger mb-3" role="alert">{error}</p>}
+      {students === null && !error ? (
+        <p className="text-sm text-muted">Loading…</p>
+      ) : students && students.length === 0 ? (
+        <p className="text-sm text-muted">Every student already has a supervisor.</p>
+      ) : (
+        <>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, email or case number…"
+            className="input !py-2.5 mb-3 max-w-sm"
+            aria-label="Search students"
+          />
+          <ul className="divide-y divide-line border-y border-line max-h-80 overflow-y-auto">
+            {shown?.map((s) => (
+              <li key={s.uid} className="flex items-center gap-3 py-3">
+                <Avatar name={s.name} photoURL={s.photoURL} size={34} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink truncate">{s.name}</p>
+                  <p className="text-xs text-muted truncate">
+                    {[s.caseNumber, s.email].filter(Boolean).join(' · ') || 'No case yet'}
+                  </p>
+                </div>
+                <button onClick={() => add(s)} disabled={addingUid !== null} className="btn-secondary !px-3 !py-1.5 text-xs">
+                  {addingUid === s.uid ? 'Adding…' : 'Add'}
+                </button>
+              </li>
+            ))}
+            {shown?.length === 0 && <li className="py-3 text-sm text-muted">No students match your search.</li>}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Student roster: supervisor assignment (Lecturer) and deadlines ────────
 
 function StudentRoster({
@@ -116,6 +214,7 @@ function StudentRoster({
   isLecturer,
   onAssign,
   onSetDeadline,
+  onRemove,
 }: {
   students: UserProfile[];
   staff: StaffDirectoryEntry[];
@@ -123,6 +222,8 @@ function StudentRoster({
   isLecturer: boolean;
   onAssign: (student: UserProfile, directoryId: string) => Promise<boolean>;
   onSetDeadline: (student: UserProfile, deadline: string | null) => Promise<boolean>;
+  // Supervisor only: release a student they added (draft cases only).
+  onRemove?: (student: UserProfile) => Promise<boolean>;
 }) {
   const [savingUid, setSavingUid] = useState<string | null>(null);
 
@@ -131,7 +232,7 @@ function StudentRoster({
       <div className="card text-center py-14 px-6">
         <p className="display text-2xl text-ink">No students yet</p>
         <p className="text-sm text-muted mt-1">
-          {isLecturer ? 'Students appear here once they register.' : 'Students the Lecturer assigns to you will appear here.'}
+          {isLecturer ? 'Students appear here once they register.' : 'Add students with the button above, or they’ll appear here when they choose you.'}
         </p>
       </div>
     );
@@ -150,6 +251,7 @@ function StudentRoster({
               {isLecturer && <th className={th}>Supervisor</th>}
               <th className={th}>Deadline</th>
               <th className={th}>Extension request</th>
+              {onRemove && <th className={th}><span className="sr-only">Actions</span></th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -215,6 +317,24 @@ function StudentRoster({
                       <span className="text-xs text-muted">—</span>
                     )}
                   </td>
+                  {onRemove && (
+                    <td className="px-4 py-4 text-right">
+                      {(!rec || stageOf(rec) === 'pending') && (
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Remove ${student.name} from your students?`)) return;
+                            setSavingUid(student.uid);
+                            await onRemove(student);
+                            setSavingUid(null);
+                          }}
+                          disabled={savingUid === student.uid}
+                          className="text-xs text-muted hover:text-danger whitespace-nowrap"
+                        >
+                          {savingUid === student.uid ? 'Removing…' : 'Remove'}
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -508,6 +628,19 @@ function Dashboard() {
       log('assign_supervisor', student.uid, `${student.name} → ${entry?.name ?? 'unassigned'}`);
     });
 
+  const handleStudentAdded = (student: UnassignedStudent) => {
+    log('assign_supervisor', student.uid, `${student.name} → ${userProfile?.name ?? 'supervisor'} (self-selected)`);
+    refresh();
+  };
+
+  const handleRemoveStudent = (student: UserProfile) =>
+    attempt(`remove ${student.name}`, async () => {
+      await updateMyStudents(student.uid, 'remove');
+      setStudents((prev) => prev.filter((s) => s.uid !== student.uid));
+      setCases((prev) => prev.filter((c) => c.studentUid !== student.uid));
+      log('assign_supervisor', student.uid, `${student.name} → unassigned (removed by supervisor)`);
+    });
+
   const handleSetDeadline = (student: UserProfile, deadline: string | null) =>
     attempt(`set ${student.name}’s deadline`, async () => {
       if (!userProfile) return;
@@ -648,9 +781,10 @@ function Dashboard() {
                 description={
                   isLecturer
                     ? 'Assign each student a supervisor and set their submission deadline.'
-                    : 'Set a submission deadline for each of your students.'
+                    : 'Add students to your list and set each one’s submission deadline.'
                 }
               />
+              {isSupervisor && <AddStudentsPanel onAdded={handleStudentAdded} />}
               <StudentRoster
                 students={students}
                 staff={staff}
@@ -658,6 +792,7 @@ function Dashboard() {
                 isLecturer={isLecturer}
                 onAssign={handleAssign}
                 onSetDeadline={handleSetDeadline}
+                onRemove={isSupervisor ? handleRemoveStudent : undefined}
               />
             </section>
 

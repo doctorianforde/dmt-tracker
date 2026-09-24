@@ -157,7 +157,7 @@ describe('POST /api/supervisor-signup', () => {
     });
 
     it('refuses an already-claimed name before creating any account', async () => {
-      assertStaffEntryClaimable.mockRejectedValueOnce(new StaffEntryUnavailableError('taken'));
+      assertStaffEntryClaimable.mockRejectedValueOnce(new StaffEntryUnavailableError());
 
       const res = await POST(makeRequest({ ...body, directoryId: 'entry-khan' }));
 
@@ -167,7 +167,7 @@ describe('POST /api/supervisor-signup', () => {
 
     it('rolls back the new account if the name is claimed mid-signup', async () => {
       createUser.mockResolvedValue({ uid: 'uid-late' });
-      claimStaffEntry.mockRejectedValueOnce(new StaffEntryUnavailableError('taken'));
+      claimStaffEntry.mockRejectedValueOnce(new StaffEntryUnavailableError());
 
       const res = await POST(makeRequest({ ...body, directoryId: 'entry-khan' }));
 

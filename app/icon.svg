@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="VIS logo">
+  <title>VIS EM DM Case Manager</title>
+  <rect width="512" height="512" rx="112" fill="#0E2A47"/>
+  <!-- page block -->
+  <rect x="146" y="110" width="252" height="316" rx="14" fill="#FFFFFF"/>
+  <path d="M384 124 V412 M372 124 V412" stroke="#D9DEE3" stroke-width="3"/>
+  <!-- cover -->
+  <rect x="114" y="90" width="262" height="316" rx="16" fill="#F4F1EA"/>
+  <!-- spine -->
+  <path d="M130 90 H158 V406 H130 A16 16 0 0 1 114 390 V106 A16 16 0 0 1 130 90 Z" fill="#1FA2A6"/>
+  <!-- title -->
+  <text x="266" y="286" text-anchor="middle"
+        font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="800"
+        font-size="104" letter-spacing="4" fill="#1FA2A6">VIS</text>
+  <rect x="206" y="310" width="120" height="8" rx="4" fill="#1FA2A6"/>
+</svg>

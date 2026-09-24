@@ -9,6 +9,10 @@ vi.mock('@/lib/auth-context', () => ({
   useAuth: vi.fn(),
 }));
 
+vi.mock('@/components/VerifyEmailScreen', () => ({
+  default: () => <div data-testid="verify-email" />,
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
   usePathname: vi.fn(),
@@ -47,6 +51,7 @@ describe('AuthGuard', () => {
       user: null,
       userProfile: null,
       loading: false,
+      emailVerified: true,
       signOut,
     });
 
@@ -65,6 +70,7 @@ describe('AuthGuard', () => {
       user: null,
       userProfile: null,
       loading: false,
+      emailVerified: true,
       signOut,
     });
 
@@ -82,6 +88,7 @@ describe('AuthGuard', () => {
       user: { uid: '123' } as unknown as ReturnType<typeof useAuth>['user'],
       userProfile: { role: 'student' } as UserProfile,
       loading: false,
+      emailVerified: true,
       signOut,
     });
 
@@ -101,6 +108,7 @@ describe('AuthGuard', () => {
       user: { uid: '123' } as unknown as ReturnType<typeof useAuth>['user'],
       userProfile: { role: 'supervisor' } as UserProfile,
       loading: false,
+      emailVerified: true,
       signOut,
     });
 
@@ -121,6 +129,7 @@ describe('AuthGuard', () => {
       user: { uid: '123' } as unknown as ReturnType<typeof useAuth>['user'],
       userProfile: { role: 'supervisor' } as UserProfile,
       loading: false,
+      emailVerified: true,
       signOut,
     });
 
@@ -141,6 +150,7 @@ describe('AuthGuard', () => {
       user: { uid: '123' } as unknown as ReturnType<typeof useAuth>['user'],
       userProfile: { role: 'drpaul' } as unknown as UserProfile,
       loading: false,
+      emailVerified: true,
       signOut,
     });
 
@@ -152,5 +162,24 @@ describe('AuthGuard', () => {
 
     expect(signOut).toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it('shows the confirm-your-email screen instead of the page until the email is verified', () => {
+    (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
+      user: { uid: 'u1', email: 'new@uwi.edu' },
+      userProfile: { uid: 'u1', name: 'New', email: 'new@uwi.edu', role: 'student' },
+      loading: false,
+      emailVerified: false,
+      signOut,
+    });
+
+    render(
+      <AuthGuard allowedRoles={['student']}>
+        <div data-testid="protected">Protected</div>
+      </AuthGuard>
+    );
+
+    expect(screen.getByTestId('verify-email')).toBeInTheDocument();
+    expect(screen.queryByTestId('protected')).not.toBeInTheDocument();
   });
 });

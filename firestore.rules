@@ -6,20 +6,27 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Signed in AND has clicked the email confirmation link. Everything past
+    // sign-in requires this; only reading/creating your own profile doesn't
+    // (sign-up needs those before the email is confirmed).
+    function isVerified() {
+      return isAuthed() && request.auth.token.email_verified == true;
+    }
+
     function userDoc() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
     function isSupervisor() {
-      return isAuthed() && userDoc().role == 'supervisor';
+      return isVerified() && userDoc().role == 'supervisor';
     }
 
     function isLecturer() {
-      return isAuthed() && userDoc().role == 'lecturer';
+      return isVerified() && userDoc().role == 'lecturer';
     }
 
     function isStudent() {
-      return isAuthed() && userDoc().role == 'student';
+      return isVerified() && userDoc().role == 'student';
     }
 
     // ── Users ────────────────────────────────────────────────────────────────
@@ -92,6 +99,7 @@ service cloud.firestore {
       // them.
       allow update: if
         (request.auth.uid == userId
+          && isVerified()
           && !request.resource.data.diff(resource.data).affectedKeys()
                .hasAny(['role'].concat(deadlineFields()))
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(assignmentFields())
@@ -180,7 +188,7 @@ service cloud.firestore {
       // Any signed-in user can see the directory (students pick their
       // supervisor from it). Only the server writes to it: entries are seeded
       // by scripts/seed-staff-directory.mjs and claimed at staff sign-up.
-      allow read: if isAuthed();
+      allow read: if isVerified();
       allow write: if false;
     }
 

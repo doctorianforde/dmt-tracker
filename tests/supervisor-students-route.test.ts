@@ -39,7 +39,7 @@ function req(method: 'GET' | 'POST', body?: unknown, token: string | null = 'goo
 }
 
 function signedInAs(role: string, name = 'Dr. Mapp') {
-  verifyIdToken.mockResolvedValue({ uid: 'sup-1' });
+  verifyIdToken.mockResolvedValue({ uid: 'sup-1', email_verified: true });
   profileGet.mockResolvedValue({ data: () => ({ role, name }) });
 }
 
@@ -56,6 +56,13 @@ describe('/api/supervisor/students', () => {
     verifyIdToken.mockRejectedValueOnce(new Error('bad'));
     const res = await GET(req('GET'));
     expect(res.status).toBe(401);
+  });
+
+  it('refuses an account whose email isn’t confirmed', async () => {
+    verifyIdToken.mockResolvedValueOnce({ uid: 'sup-1', email_verified: false });
+    const res = await GET(req('GET'));
+    expect(res.status).toBe(403);
+    expect(listUnassignedStudents).not.toHaveBeenCalled();
   });
 
   it('only lets supervisors in', async () => {

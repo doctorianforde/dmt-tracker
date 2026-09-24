@@ -16,7 +16,11 @@ async function requireSupervisor(request: Request): Promise<{ uid: string; name:
 
   let uid: string;
   try {
-    uid = (await getAdminAuth().verifyIdToken(token)).uid;
+    const decoded = await getAdminAuth().verifyIdToken(token);
+    if (!decoded.email_verified) {
+      return NextResponse.json({ error: 'Please confirm your email address first.' }, { status: 403 });
+    }
+    uid = decoded.uid;
   } catch {
     return NextResponse.json({ error: 'Your session has expired. Please sign in again.' }, { status: 401 });
   }

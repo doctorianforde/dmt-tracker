@@ -14,8 +14,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  // The address a reset link was sent to, once sent.
+  const [resetSentTo, setResetSentTo] = useState<string | null>(null);
 
-  const { user, userProfile, signIn, signUp } = useAuth();
+  const { user, userProfile, signIn, signUp, resetPassword } = useAuth();
   const { activeQuote } = useTheme();
   const router = useRouter();
 
@@ -49,6 +52,36 @@ export default function LoginPage() {
       } else {
         setError(msg);
       }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openReset = () => {
+    setResetting(true);
+    setResetSentTo(null);
+    setError('');
+  };
+
+  const closeReset = () => {
+    setResetting(false);
+    setResetSentTo(null);
+    setError('');
+  };
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      await resetPassword(email.trim());
+      setResetSentTo(email.trim());
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Couldn’t send the reset email';
+      if (msg.includes('invalid-email')) setError('That doesn’t look like a valid email address');
+      else if (msg.includes('too-many-requests')) setError('Too many attempts. Please wait a few minutes and try again.');
+      else if (msg.includes('user-not-found')) setResetSentTo(email.trim()); // don't reveal which emails have accounts
+      else setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -88,6 +121,58 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           <BrandMark className="text-on-canvas mb-8 lg:hidden" />
 
+          {resetting ? (
+          <div className="card p-7 sm:p-9">
+            <p className="eyebrow text-muted">Account help</p>
+            <h1 className="display text-4xl text-ink mt-2">Reset password</h1>
+            {resetSentTo ? (
+              <div className="mt-5 space-y-4" role="status">
+                <p className="text-sm text-ink">
+                  If an account exists for <strong>{resetSentTo}</strong>, we’ve sent it a link to choose a new password.
+                </p>
+                <p className="text-sm text-muted">
+                  The email comes from Firebase (noreply@…firebaseapp.com). Check your spam or junk folder if it isn’t in your inbox within a few minutes.
+                </p>
+                <button onClick={closeReset} className="btn-primary w-full !py-3.5">Back to sign in</button>
+                <button onClick={() => setResetSentTo(null)} className="btn-ghost w-full">Send to a different email</button>
+              </div>
+            ) : (
+              <>
+                <p className="text-muted text-sm mt-2 mb-7">Enter the email you signed up with and we’ll send you a reset link.</p>
+                <form onSubmit={handleReset} className="space-y-4">
+                  <div>
+                    <label className="field-label" htmlFor="reset-email">Email address</label>
+                    <input
+                      id="reset-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@university.edu"
+                      className="input"
+                      autoComplete="email"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  {error && (
+                    <div className="rounded-control bg-danger/10 px-4 py-3 text-danger text-sm flex items-start gap-2" role="alert">
+                      <span className="mt-0.5 flex-shrink-0">⚠</span>
+                      <span>{error}</span>
+                    </div>
+                  )}
+                  <button type="submit" disabled={submitting} className="btn-primary w-full !py-3.5 mt-2">
+                    {submitting ? 'Sending…' : 'Send reset link'}
+                  </button>
+                </form>
+                <div className="mt-7 pt-6 border-t border-line text-center">
+                  <button onClick={closeReset} className="text-sm text-accent font-semibold hover:underline">
+                    ← Back to sign in
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          ) : (
           <div className="card p-7 sm:p-9">
             <p className="eyebrow text-muted">{isSignUp ? 'New student' : 'Welcome back'}</p>
             <h1 className="display text-4xl text-ink mt-2">
@@ -129,7 +214,14 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="field-label" htmlFor="password">Password</label>
+                <div className="flex items-baseline justify-between">
+                  <label className="field-label" htmlFor="password">Password</label>
+                  {!isSignUp && (
+                    <button type="button" onClick={openReset} className="text-xs text-accent font-semibold hover:underline">
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
                 <input
                   id="password"
                   type="password"
@@ -182,6 +274,7 @@ export default function LoginPage() {
               )}
             </div>
           </div>
+          )}
         </div>
       </section>
     </div>

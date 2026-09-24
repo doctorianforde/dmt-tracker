@@ -11,6 +11,7 @@ import ProgressChecklist from '@/components/ProgressChecklist';
 import AvatarUpload from '@/components/ui/AvatarUpload';
 import ProgressRing from '@/components/ui/ProgressRing';
 import SectionHeader from '@/components/ui/SectionHeader';
+import ChangePasswordForm from '@/components/ChangePasswordForm';
 import {
   getCaseRecord,
   saveCaseRecord,
@@ -97,6 +98,7 @@ function Dashboard() {
   const [staff, setStaff] = useState<StaffDirectoryEntry[]>([]);
   const [staffError, setStaffError] = useState<string | null>(null);
   const [savingSupervisor, setSavingSupervisor] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
 
   const uid = user?.uid;
   const profileCaseNumber = userProfile?.caseNumber;
@@ -369,6 +371,24 @@ function Dashboard() {
               ? 'You can change this until you submit your case for review.'
               : 'Pick your supervisor from the list, even if they haven’t joined VIS yet.'}
           </p>
+        </div>
+        <div className="sm:col-span-2 pt-5 border-t border-line">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="field-label !mb-1">Password</p>
+              <p className="text-sm text-muted">Signed in as {userProfile?.email}</p>
+            </div>
+            {!showPasswordForm && (
+              <button type="button" onClick={() => setShowPasswordForm(true)} className="btn-secondary">
+                Change password
+              </button>
+            )}
+          </div>
+          {showPasswordForm && (
+            <div className="mt-5">
+              <ChangePasswordForm onDone={() => setShowPasswordForm(false)} />
+            </div>
+          )}
         </div>
       </div>
     </section>

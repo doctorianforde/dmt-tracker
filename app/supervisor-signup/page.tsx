@@ -45,7 +45,7 @@ function SignupForm() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { user, userProfile, signIn } = useAuth();
+  const { user, userProfile, signIn, sendVerificationEmail } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -107,6 +107,9 @@ function SignupForm() {
         return;
       }
       await signIn(email, password);
+      // The account is created server-side, so send the confirmation email
+      // now that they're signed in. The verify screen offers a resend.
+      await sendVerificationEmail().catch((err) => console.error('Failed to send verification email:', err));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Sign-up failed';
       setError(msg);

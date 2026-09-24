@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import VerifyEmailScreen from '@/components/VerifyEmailScreen';
 import type { UserRole } from '@/types';
 
 interface AuthGuardProps {
@@ -20,7 +21,7 @@ const ROLE_HOME: Record<UserRole, string> = {
 };
 
 export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
-  const { user, userProfile, loading, signOut } = useAuth();
+  const { user, userProfile, loading, emailVerified, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -53,7 +54,11 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     );
   }
 
-  if (!user || !userProfile || !allowedRoles.includes(userProfile.role)) return null;
+  if (!user) return null;
+  // Nothing past sign-in until the email is confirmed (also enforced in
+  // firestore.rules).
+  if (!emailVerified) return <VerifyEmailScreen />;
+  if (!userProfile || !allowedRoles.includes(userProfile.role)) return null;
 
   return <>{children}</>;
 }

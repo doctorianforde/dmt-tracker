@@ -11,8 +11,11 @@ import ProgressChecklist from '@/components/ProgressChecklist';
 import AvatarUpload from '@/components/ui/AvatarUpload';
 import ProgressRing from '@/components/ui/ProgressRing';
 import SectionHeader from '@/components/ui/SectionHeader';
-import ChangePasswordForm from '@/components/ChangePasswordForm';
 import SiteFooter from '@/components/SiteFooter';
+import ProfileSection from '@/components/student/ProfileSection';
+import ReviewFeedback from '@/components/student/ReviewFeedback';
+import AccountabilityCard from '@/components/student/AccountabilityCard';
+import ApprovalPipeline, { STAGE_INFO } from '@/components/student/ApprovalPipeline';
 import {
   getCaseRecord,
   saveCaseRecord,
@@ -22,33 +25,9 @@ import {
   getStaffDirectory,
   setSupervisorChoice,
 } from '@/lib/firestore';
-import type { CaseRecord, CaseSections, ApprovalStage, UserRole, StaffDirectoryEntry } from '@/types';
-import { START_YEAR_MIN, START_YEAR_MAX, CLASS_YEARS, ACCOUNTABILITY_WINDOW_DAYS } from '@/lib/config';
+import type { CaseRecord, CaseSections, UserRole, StaffDirectoryEntry } from '@/types';
 import { daysUntil, effectiveDeadline } from '@/lib/deadlines';
-
-const SECTION_KEYS: (keyof CaseSections)[] = ['intro', 'caseReport', 'discussion', 'conclusion', 'references'];
-
-const DEFAULT_SECTIONS: CaseSections = {
-  intro: false,
-  caseReport: false,
-  discussion: false,
-  conclusion: false,
-  references: false,
-};
-
-const STAGE_INFO: Record<ApprovalStage, { label: string; step: number }> = {
-  pending: { label: 'Draft — not yet submitted', step: 0 },
-  supervisor: { label: 'With your supervisor', step: 1 },
-  lecturer: { label: 'With the Lecturer', step: 2 },
-  approved: { label: 'Approved', step: 3 },
-};
-
-const PIPELINE_STEPS: { stage: ApprovalStage; label: string; dot: string }[] = [
-  { stage: 'pending', label: 'Draft', dot: 'bg-ink' },
-  { stage: 'supervisor', label: 'Supervisor', dot: 'bg-warn' },
-  { stage: 'lecturer', label: 'Lecturer', dot: 'bg-gold' },
-  { stage: 'approved', label: 'Approved', dot: 'bg-ok' },
-];
+import { DEFAULT_SECTIONS, SECTION_KEYS, errorMessage, formSnapshot, reviewFeedback } from '@/lib/case-state';
 
 // Defined once at module scope — see the same note in SupervisorDashboard.tsx.
 const STUDENT_ROLES: UserRole[] = ['student'];
@@ -59,23 +38,6 @@ export default function StudentDashboard() {
       <Dashboard />
     </AuthGuard>
   );
-}
-
-// A stable string of the editable form fields, for unsaved-change detection.
-function formSnapshot(f: {
-  caseNumber: string;
-  startYear: number;
-  classYear: number;
-  sections: CaseSections;
-  extensionReason: string;
-}) {
-  return JSON.stringify([
-    f.caseNumber.trim(),
-    f.startYear,
-    f.classYear,
-    SECTION_KEYS.map((k) => Boolean(f.sections[k])),
-    f.extensionReason.trim(),
-  ]);
 }
 
 function Dashboard() {
@@ -94,12 +56,10 @@ function Dashboard() {
   const [classYear, setClassYear] = useState(1);
   const [sections, setSections] = useState<CaseSections>(DEFAULT_SECTIONS);
   const [extensionReason, setExtensionReason] = useState('');
-  const [showExtension, setShowExtension] = useState(false);
 
   const [staff, setStaff] = useState<StaffDirectoryEntry[]>([]);
   const [staffError, setStaffError] = useState<string | null>(null);
   const [savingSupervisor, setSavingSupervisor] = useState(false);
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
 
   const uid = user?.uid;
   const profileCaseNumber = userProfile?.caseNumber;
@@ -110,7 +70,7 @@ function Dashboard() {
   useEffect(() => {
     getStaffDirectory()
       .then(setStaff)
-      .catch((err: unknown) => setStaffError('Couldn’t load the staff list: ' + (err instanceof Error ? err.message : 'Unknown error')));
+      .catch((err: unknown) => setStaffError('Couldn’t load the staff list: ' + errorMessage(err)));
   }, []);
 
   // Keyed on the fields that define the form (not the whole profile object),
@@ -131,8 +91,7 @@ function Dashboard() {
           }
         }
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Unknown error';
-        setLoadError('Failed to load your case: ' + msg);
+        setLoadError('Failed to load your case: ' + errorMessage(err));
       } finally {
         setDataLoading(false);
       }
@@ -186,8 +145,7 @@ function Dashboard() {
       await refreshProfile();
       return true;
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      showMessage('Couldn’t save: ' + msg, false);
+      showMessage('Couldn’t save: ' + errorMessage(err), false);
       return false;
     } finally {
       setSaving(false);
@@ -210,7 +168,7 @@ function Dashboard() {
       await refreshProfile();
       showMessage(entry ? `Supervisor set to ${entry.name}` : 'Supervisor cleared', true);
     } catch (err: unknown) {
-      showMessage('Couldn’t update your supervisor: ' + (err instanceof Error ? err.message : 'Unknown error'), false);
+      showMessage('Couldn’t update your supervisor: ' + errorMessage(err), false);
     } finally {
       setSavingSupervisor(false);
     }
@@ -225,8 +183,7 @@ function Dashboard() {
       setCaseRecord((prev) => (prev ? { ...prev, approvalStage: 'supervisor' } : prev));
       showMessage('Submitted for review 🎉', true);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      showMessage('Submission failed: ' + msg, false);
+      showMessage('Submission failed: ' + errorMessage(err), false);
     } finally {
       setSubmitting(false);
     }
@@ -241,8 +198,7 @@ function Dashboard() {
       setCaseRecord((prev) => (prev ? { ...prev, resubmittedAt: new Date() } : prev));
       showMessage('Your reviewer has been told it’s ready for another look', true);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      showMessage('Couldn’t resubmit: ' + msg, false);
+      showMessage('Couldn’t resubmit: ' + errorMessage(err), false);
     } finally {
       setSubmitting(false);
     }
@@ -276,123 +232,34 @@ function Dashboard() {
   const completedCount = SECTION_KEYS.filter((k) => sections[k]).length;
   const completionPercent = Math.round((completedCount / SECTION_KEYS.length) * 100);
   const firstName = userProfile?.name?.replace(/^(dr\.?|prof\.?)\s+/i, '').split(' ')[0] ?? 'there';
-  const approvalStage: ApprovalStage = caseRecord?.approvalStage ?? (caseRecord?.greenLight ? 'approved' : 'pending');
+  const feedback = reviewFeedback(caseRecord);
+  const approvalStage = feedback.stage;
   const stageInfo = STAGE_INFO[approvalStage];
-
-  const currentStageApproval =
-    approvalStage === 'supervisor' ? caseRecord?.supervisorApproval
-    : approvalStage === 'lecturer' ? caseRecord?.lecturerApproval
-    : undefined;
-  const rejectionReason = !currentStageApproval?.approved ? currentStageApproval?.rejectionReason : undefined;
-  const rejectedAt = currentStageApproval?.rejectedAt;
-  const resubmitted =
-    !!rejectionReason && !!caseRecord?.resubmittedAt &&
-    (!rejectedAt || caseRecord.resubmittedAt.getTime() > rejectedAt.getTime());
 
   const supervisorName = userProfile?.supervisorDirectoryName ?? userProfile?.assignedSupervisorName;
   const hasSupervisor = !!(userProfile?.supervisorDirectoryId || userProfile?.assignedSupervisorUid);
   const supervisorSignedUp = !!userProfile?.assignedSupervisorUid;
-  const supervisorLocked = approvalStage !== 'pending';
+  const busy = submitting || saving;
 
   const deadline = effectiveDeadline(userProfile, caseRecord);
   const daysLeft = deadline ? daysUntil(deadline) : Infinity;
-  const deadlineClose = daysLeft <= ACCOUNTABILITY_WINDOW_DAYS;
-  const showAccountability = deadlineClose || showExtension || !!extensionReason;
 
   const profileSection = (index: number) => (
-    <section>
-      <SectionHeader
-        index={index}
-        eyebrow="Profile"
-        title={isProfileSetup ? 'Your details' : 'Set up your profile'}
-        description={isProfileSetup ? undefined : 'Add your case number to start tracking. It’s locked after the first save.'}
-      />
-      <div className="card p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <div className="sm:col-span-2">
-          <label className="field-label" htmlFor="case-number">Case number</label>
-          <input
-            id="case-number"
-            type="text"
-            value={caseNumber}
-            onChange={(e) => setCaseNumber(e.target.value)}
-            placeholder="e.g. DMT-2026-001"
-            disabled={isProfileSetup}
-            className="input font-mono"
-          />
-          {isProfileSetup && <p className="text-xs text-muted mt-1.5">Locked after first save</p>}
-        </div>
-        <div>
-          <label className="field-label" htmlFor="start-year">Start year</label>
-          <input
-            id="start-year"
-            type="number"
-            value={startYear}
-            onChange={(e) => setStartYear(Number(e.target.value))}
-            min={START_YEAR_MIN}
-            max={START_YEAR_MAX}
-            className="input"
-          />
-        </div>
-        <div>
-          <label className="field-label" htmlFor="class-year">Class year</label>
-          <select id="class-year" value={classYear} onChange={(e) => setClassYear(Number(e.target.value))} className="input">
-            {CLASS_YEARS.map((y) => (
-              <option key={y} value={y}>Year {y}</option>
-            ))}
-          </select>
-        </div>
-        <div className="sm:col-span-2">
-          <label className="field-label" htmlFor="supervisor">Your supervisor</label>
-          <select
-            id="supervisor"
-            value={userProfile?.supervisorDirectoryId ?? ''}
-            onChange={(e) => handleSupervisorChange(e.target.value)}
-            disabled={supervisorLocked || savingSupervisor}
-            className="input"
-          >
-            <option value="">— Choose your supervisor —</option>
-            {staff.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-            {/* Assigned before the staff list existed. */}
-            {!userProfile?.supervisorDirectoryId && userProfile?.assignedSupervisorName && (
-              <option value="" disabled>{userProfile.assignedSupervisorName}</option>
-            )}
-          </select>
-          <p className="text-xs text-muted mt-1.5">
-            {staffError
-              ? staffError
-              : savingSupervisor
-              ? 'Saving…'
-              : supervisorLocked
-              ? 'Locked because your case has been submitted. Ask your Lecturer if it needs to change.'
-              : hasSupervisor && !supervisorSignedUp
-              ? `${supervisorName} hasn’t joined VIS yet. You’ll be linked automatically when they sign up.`
-              : hasSupervisor
-              ? 'You can change this until you submit your case for review.'
-              : 'Pick your supervisor from the list, even if they haven’t joined VIS yet.'}
-          </p>
-        </div>
-        <div className="sm:col-span-2 pt-5 border-t border-line">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="field-label !mb-1">Password</p>
-              <p className="text-sm text-muted">Signed in as {userProfile?.email}</p>
-            </div>
-            {!showPasswordForm && (
-              <button type="button" onClick={() => setShowPasswordForm(true)} className="btn-secondary">
-                Change password
-              </button>
-            )}
-          </div>
-          {showPasswordForm && (
-            <div className="mt-5">
-              <ChangePasswordForm onDone={() => setShowPasswordForm(false)} />
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
+    <ProfileSection
+      index={index}
+      userProfile={userProfile}
+      caseNumber={caseNumber}
+      onCaseNumberChange={setCaseNumber}
+      startYear={startYear}
+      onStartYearChange={setStartYear}
+      classYear={classYear}
+      onClassYearChange={setClassYear}
+      staff={staff}
+      staffError={staffError}
+      savingSupervisor={savingSupervisor}
+      supervisorLocked={approvalStage !== 'pending'}
+      onSupervisorChange={handleSupervisorChange}
+    />
   );
 
   let n = 0;
@@ -428,38 +295,7 @@ function Dashboard() {
           </div>
         </header>
 
-        {/* Review feedback */}
-        {rejectionReason && !resubmitted && (
-          <div className="card p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 border-danger/40">
-            <span className="w-11 h-11 rounded-full bg-danger/15 text-danger flex items-center justify-center text-lg flex-shrink-0" aria-hidden>✕</span>
-            <div className="flex-1">
-              <p className="font-bold text-ink">Changes requested</p>
-              <p className="text-sm text-ink/80 mt-0.5">“{rejectionReason}”</p>
-              <p className="text-xs text-muted mt-1.5">Make the changes, then let your reviewer know it’s ready for another look.</p>
-            </div>
-            <button onClick={handleResubmit} disabled={submitting || saving} className="btn-primary whitespace-nowrap">
-              {submitting ? 'Sending…' : 'Mark as ready for re-review'}
-            </button>
-          </div>
-        )}
-        {resubmitted && (
-          <div className="card p-5 flex items-center gap-4">
-            <span className="w-11 h-11 rounded-full bg-info/15 text-info flex items-center justify-center text-lg flex-shrink-0" aria-hidden>↻</span>
-            <div>
-              <p className="font-bold text-ink">Resubmitted for re-review</p>
-              <p className="text-sm text-muted mt-0.5">Your reviewer can see you’ve addressed their feedback: “{rejectionReason}”</p>
-            </div>
-          </div>
-        )}
-        {approvalStage === 'approved' && (
-          <div className="card p-5 flex items-center gap-4">
-            <span className="w-11 h-11 rounded-full bg-ok/15 text-ok flex items-center justify-center text-xl flex-shrink-0" aria-hidden>✓</span>
-            <div>
-              <p className="font-bold text-ink">Case approved 🎉</p>
-              <p className="text-sm text-muted mt-0.5">Your Lecturer has given your case report final approval.</p>
-            </div>
-          </div>
-        )}
+        <ReviewFeedback feedback={feedback} busy={busy} submitting={submitting} onResubmit={handleResubmit} />
 
         {!isProfileSetup && profileSection(++n)}
 
@@ -482,94 +318,26 @@ function Dashboard() {
             </div>
           </div>
 
-          {showAccountability ? (
-            <div className="card p-6 mt-4 border-warn/50">
-              <div className="flex items-start gap-3">
-                <span className="w-10 h-10 rounded-full bg-warn/15 text-warn flex items-center justify-center flex-shrink-0 font-bold" aria-hidden>!</span>
-                <div className="flex-1">
-                  <p className="font-bold text-ink">Accountability check</p>
-                  <p className="text-sm text-muted mt-0.5">
-                    {!deadlineClose
-                      ? 'Tell your supervisors early if you think you won’t make your deadline.'
-                      : daysLeft < 0
-                      ? 'Your deadline has passed. Let your supervisors know what’s happening.'
-                      : daysLeft <= 14
-                      ? `Your deadline is in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}. Are you on track?`
-                      : `Your deadline is approaching (${daysLeft} days). Let us know if you need an extension.`}
-                  </p>
-                </div>
-              </div>
-              <label className="field-label mt-5" htmlFor="extension-reason">Extension reason (if you can’t meet the deadline)</label>
-              <textarea
-                id="extension-reason"
-                value={extensionReason}
-                onChange={(e) => setExtensionReason(e.target.value)}
-                placeholder="Explain why you need more time so your supervisors are informed…"
-                rows={3}
-                className="input resize-none"
-              />
-              <p className="text-xs text-muted mt-1.5">Saved with your case and visible to your supervisor and Lecturer. Only they can change your deadline.</p>
-            </div>
-          ) : (
-            <button onClick={() => setShowExtension(true)} className="text-sm text-on-canvas-muted hover:underline mt-4">
-              Won’t make your deadline? Request an extension →
-            </button>
-          )}
+          <AccountabilityCard
+            daysLeft={daysLeft}
+            extensionReason={extensionReason}
+            onExtensionReasonChange={setExtensionReason}
+          />
         </section>
 
         {/* Review pipeline */}
         <section>
           <SectionHeader index={++n} eyebrow="Review" title="Approval pipeline" />
-          <div className="card p-6 sm:p-8">
-            <ol className="grid grid-cols-4">
-              {PIPELINE_STEPS.map((step, i) => {
-                const reached = stageInfo.step >= i;
-                const current = stageInfo.step === i;
-                return (
-                  <li key={step.stage} className="relative flex flex-col items-center text-center">
-                    {i > 0 && (
-                      <span
-                        className={`absolute top-4 right-1/2 w-full h-1 -z-0 rounded-full ${stageInfo.step >= i ? step.dot : 'bg-ink/10'}`}
-                        aria-hidden
-                      />
-                    )}
-                    <span
-                      className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition
-                        ${reached ? `${step.dot} text-white` : 'bg-surface2 text-muted'}
-                        ${current ? 'ring-4 ring-accent/25 scale-110' : ''}`}
-                    >
-                      {reached ? '✓' : i + 1}
-                    </span>
-                    <span className={`text-xs sm:text-sm mt-2 font-semibold ${current ? 'text-ink' : 'text-muted'}`}>
-                      {step.stage === 'supervisor' && supervisorName ? supervisorName : step.label}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-
-            {isProfileSetup && approvalStage === 'pending' && (
-              <div className="mt-8 pt-6 border-t border-line flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <p className="font-bold text-ink">Ready for review?</p>
-                  <p className="text-sm text-muted mt-0.5">
-                    {!hasSupervisor
-                      ? 'Choose your supervisor in your profile below before you submit.'
-                      : supervisorSignedUp
-                      ? `Send your case to ${supervisorName} when you’re ready for feedback.`
-                      : `${supervisorName} hasn’t joined VIS yet — your case will be waiting for them when they sign up.`}
-                  </p>
-                </div>
-                <button
-                  onClick={handleSubmitForReview}
-                  disabled={submitting || saving || !hasSupervisor}
-                  className="btn-primary whitespace-nowrap"
-                >
-                  {submitting ? 'Submitting…' : 'Submit for review →'}
-                </button>
-              </div>
-            )}
-          </div>
+          <ApprovalPipeline
+            stage={approvalStage}
+            supervisorName={supervisorName}
+            canSubmit={isProfileSetup && approvalStage === 'pending'}
+            hasSupervisor={hasSupervisor}
+            supervisorSignedUp={supervisorSignedUp}
+            busy={busy}
+            submitting={submitting}
+            onSubmit={handleSubmitForReview}
+          />
         </section>
 
         {/* Case sections */}

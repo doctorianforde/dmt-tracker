@@ -148,7 +148,7 @@ describe('AuthGuard', () => {
     // caused the original infinite-loop bug when that guess matched the current page.
     (useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
       user: { uid: '123' } as unknown as ReturnType<typeof useAuth>['user'],
-      userProfile: { role: 'drpaul' } as unknown as UserProfile,
+      userProfile: { role: 'retired-role' } as unknown as UserProfile,
       loading: false,
       emailVerified: true,
       signOut,

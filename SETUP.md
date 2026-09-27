@@ -1,4 +1,4 @@
-# DMT Case Tracker — Setup Guide
+# VIS — Setup Guide
 
 ## 1. Firebase Project Setup
 
@@ -46,7 +46,13 @@ commit it or expose it as a `NEXT_PUBLIC_*` variable.
 
 ## 3. Firestore Security Rules
 
-In Firebase Console → Firestore → Rules, paste the contents of `firestore.rules`.
+Publish `firestore.rules` with the Firebase CLI (`npm install -g firebase-tools`,
+then `firebase login`):
+
+```bash
+npm run test:rules    # check first — see TEST_GUIDE.md
+npm run deploy:rules
+```
 
 ## 4. Storage CORS (for file uploads)
 
@@ -91,16 +97,27 @@ Valid roles in Firestore are: `student`, `supervisor`, `lecturer`. `firestore.ru
 only lets a client create their own profile with `role: 'student'` — anything
 else has to go through the Admin SDK, which bypasses the rules by design.
 
-### Assigning students to supervisors
+### Staff directory and supervisor assignment
 
-Students no longer pick their own supervisor. The Lecturer assigns (and can
-reassign) each student to a supervisor from the "Manage Students" panel on
-their dashboard (`/supervisor`, visible only to the `lecturer` role). A
-student's assignment lives on their profile
+Students pick their supervisor from the staff directory (the `staff`
+collection). They can change the pick until they submit their case, and after
+that it's locked. The Lecturer can reassign any student at any time from the
+**Students & supervisors** panel on `/supervisor`. A supervisor can also add
+students who have no supervisor yet, from **Your students**.
+
+The directory is seeded with the real staff names:
+
+```bash
+npm run seed:staff   # safe to re-run; skips names already listed
+```
+
+A staff member claims their name when they sign up. Anyone who picked that
+name before they joined is then linked to their account automatically.
+
+A student's assignment lives on their profile
 (`users/{uid}.assignedSupervisorUid/Name`) and is copied onto their case
-record (`cases/{caseNumber}.supervisorUid/Name`) at creation time, kept in
-sync by the Lecturer's reassignment action. A supervisor only ever sees
-cases where `supervisorUid` matches their own uid — enforced in
+(`cases/{caseNumber}.supervisorUid/Name`). A supervisor only ever sees cases
+where `supervisorUid` matches their own uid. This is enforced in
 `firestore.rules`, not just hidden in the UI.
 
 ## 6. Local Development
@@ -116,10 +133,14 @@ npm run dev
 Available scripts:
 
 ```bash
-npm run dev      # Start development server
-npm run build    # Production build
-npm run lint     # ESLint
-npm run test     # Vitest
+npm run dev           # Start development server
+npm run build         # Production build
+npm run lint          # ESLint
+npm test              # Unit + component tests
+npm run test:rules    # Firestore rules tests on the emulator (needs Java 21)
+npm run deploy:rules  # Publish firestore.rules
+npm run seed:staff    # Seed the staff directory
+npm run seed:test     # Create test accounts (see TEST_GUIDE.md)
 ```
 
 ## 7. Deploy to Vercel
@@ -137,6 +158,6 @@ npm run test     # Vitest
 
 | Role | Login | Can Do |
 |------|-------|--------|
-| Student | Self-register on `/` | View/edit own profile and case, submit for review once a supervisor is assigned |
+| Student | Self-register on `/` | View/edit own profile and case, pick a supervisor from the staff directory, submit for review once a supervisor is assigned |
 | Supervisor | Sign up via `/supervisor-signup` with `SUPERVISOR_INVITE_CODE` | View and approve cases for their assigned students only |
 | Lecturer | Sign up via `/supervisor-signup` with `LECTURER_INVITE_CODE` | View all cases, assign/reassign students to supervisors, grant/revoke final approval |

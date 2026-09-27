@@ -92,6 +92,14 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(assignmentFields().concat(deadlineFields()))
         && photoOk();
 
+      // The case number is set once and then locked (the student dashboard
+      // says so). Without this a student could clear it to reopen their
+      // supervisor pick after submitting.
+      function caseNumberLocked() {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['caseNumber'])
+          || resource.data.get('caseNumber', '') == '';
+      }
+
       // Users can update their own profile but cannot change their role or
       // move their own deadline; students may pick their supervisor (see
       // above). The Lecturer may update the assignment and deadline fields on
@@ -102,6 +110,7 @@ service cloud.firestore {
           && isVerified()
           && !request.resource.data.diff(resource.data).affectedKeys()
                .hasAny(['role'].concat(deadlineFields()))
+          && caseNumberLocked()
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(assignmentFields())
               || (studentCanChangeSupervisor() && supervisorChoiceValid()))
           && photoOk())
@@ -128,18 +137,40 @@ service cloud.firestore {
           || request.resource.data.supervisorUid == userDoc().assignedSupervisorUid;
       }
 
-      // Students create a case — ownership proven by studentUid in the new document
+      // Students create a case — ownership proven by studentUid in the new
+      // document. A new case starts as a draft with no approvals recorded, and
+      // its caseNumber field must match the document id.
       allow create: if isStudent()
         && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.caseNumber == caseNumber
         && request.resource.data.greenLight == false
-        && !('customDeadline' in request.resource.data)
+        && request.resource.data.get('approvalStage', 'pending') == 'pending'
+        && !request.resource.data.keys().hasAny(['customDeadline', 'supervisorApproval', 'lecturerApproval'])
         && assignedSupervisorMatches();
 
-      // Privileged fields that students can never modify. customDeadline is a
-      // legacy student-set deadline; deadlines are now set by staff on the
-      // student's profile, so it's frozen here.
+      // Fields that students can never modify. customDeadline is a legacy
+      // student-set deadline; deadlines are now set by staff on the student's
+      // profile, so it's frozen here. studentUid identifies the case's owner.
       function protectedCaseFields() {
-        return ['greenLight', 'supervisorApproval', 'lecturerApproval', 'customDeadline'];
+        return ['greenLight', 'supervisorApproval', 'lecturerApproval', 'customDeadline', 'studentUid'];
+      }
+
+      // Supervisor review happens only at the 'supervisor' stage: approving
+      // moves the case on to the Lecturer; rejecting keeps it where it is.
+      function supervisorReviewOk() {
+        let before = resource.data.get('approvalStage', 'pending');
+        let after = request.resource.data.get('approvalStage', 'pending');
+        let approved = request.resource.data.get('supervisorApproval', {}).get('approved', false);
+        return before == 'supervisor'
+          && ((after == 'lecturer' && approved == true)
+              || (after == 'supervisor' && approved == false));
+      }
+
+      // The green light only ever accompanies a finished review. (Cases from
+      // before approvalStage existed have no stage; they're left alone.)
+      function greenLightConsistent() {
+        return request.resource.data.greenLight != true
+          || request.resource.data.get('approvalStage', 'approved') == 'approved';
       }
 
       // Students may copy their own profile's supervisor onto their case,
@@ -157,6 +188,7 @@ service cloud.firestore {
         // Students may submit their case (pending -> supervisor) but cannot change other stages,
         // and can never touch the protected fields above.
         return !affected.hasAny(protectedCaseFields())
+          && request.resource.data.get('caseNumber', caseNumber) == caseNumber
           && studentSupervisorSyncOk()
           && (!affected.hasAny(['approvalStage'])
               || (resource.data.approvalStage == 'pending'
@@ -173,14 +205,16 @@ service cloud.firestore {
         (isSupervisor()
           && resource.data.supervisorUid == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['approvalStage', 'supervisorApproval', 'updatedAt']))
+               .hasOnly(['approvalStage', 'supervisorApproval', 'updatedAt'])
+          && supervisorReviewOk())
         ||
         // The Lecturer can give/revoke final green light, record final approval,
         // reassign a case to a different supervisor, and — when a student has
         // picked them as their supervisor — record the supervisor approval.
         (isLecturer()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['greenLight', 'approvalStage', 'lecturerApproval', 'supervisorApproval', 'supervisorUid', 'supervisorName', 'updatedAt']));
+               .hasOnly(['greenLight', 'approvalStage', 'lecturerApproval', 'supervisorApproval', 'supervisorUid', 'supervisorName', 'updatedAt'])
+          && greenLightConsistent());
     }
 
     // ── Staff directory ──────────────────────────────────────────────────────
@@ -202,7 +236,12 @@ service cloud.firestore {
       // append-only: no edits or deletes, so a log can't be altered after the
       // fact (though a user could still choose not to log — see the note in
       // lib/firestore.ts).
-      allow create: if isAuthed() && request.resource.data.actorUid == request.auth.uid;
+      // The role and timestamp must be genuine too, so an entry can't claim to
+      // come from a Lecturer or be backdated.
+      allow create: if isAuthed()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.actorRole == userDoc().role
+        && request.resource.data.createdAt == request.time;
       allow update, delete: if false;
     }
   }

@@ -42,6 +42,9 @@ try {
     email: ACCOUNT.email,
     password: ACCOUNT.password,
     displayName: ACCOUNT.name,
+    // Provisioned by an admin, so skip the email-confirmation step the app
+    // otherwise requires.
+    emailVerified: true,
   });
 
   await db.collection('users').doc(userRecord.uid).set({
@@ -50,6 +53,18 @@ try {
     role: ACCOUNT.role,
     createdAt: FieldValue.serverTimestamp(),
   });
+
+  // Supervisors need a staff-directory entry so students can pick them (the
+  // sign-up route does the same).
+  if (ACCOUNT.role === 'supervisor') {
+    await db.collection('staff').add({
+      name: ACCOUNT.name,
+      uid: userRecord.uid,
+      role: ACCOUNT.role,
+      createdAt: FieldValue.serverTimestamp(),
+      claimedAt: FieldValue.serverTimestamp(),
+    });
+  }
 
   console.log('✅ Account created successfully!');
   console.log(`   Name:     ${ACCOUNT.name}`);

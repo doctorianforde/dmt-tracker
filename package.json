@@ -11,11 +11,12 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-vis \"vitest run --config vitest.rules.config.ts\"",
     "deploy:rules": "firebase deploy --only firestore:rules",
-    "seed:staff": "node --env-file=.env.local scripts/seed-staff-directory.mjs"
+    "seed:staff": "node --env-file=.env.local scripts/seed-staff-directory.mjs",
+    "seed:test": "node --env-file=.env.local scripts/create-test-data.js"
   },
   "dependencies": {
-    "@fontsource/roboto": "^5.2.10",
     "firebase": "^10.12.0",
     "firebase-admin": "^14.2.0",
     "next": "^16.2.9",
@@ -26,6 +27,7 @@
     "jose": "^4.15.9"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

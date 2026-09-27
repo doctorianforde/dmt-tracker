@@ -2,12 +2,16 @@
 
 /**
  * Test Data Seeding Script
- * Creates supervisor, lecturer, and student test accounts with sample case data.
+ * Creates supervisor, lecturer, and student test accounts with a case at each
+ * stage of the approval pipeline. Safe to re-run: existing accounts are
+ * reused and their profiles/cases reset to the values below.
  *
  * Usage: node --env-file=.env.local scripts/create-test-data.js
  *
  * Requires FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, and
  * FIREBASE_ADMIN_PRIVATE_KEY in .env.local (see .env.local.example).
+ *
+ * Everything here is test-only — delete these accounts before handing over.
  */
 
 const admin = require('firebase-admin');
@@ -27,201 +31,115 @@ admin.initializeApp({
 
 const auth = admin.auth();
 const db = admin.firestore();
+const { FieldValue } = admin.firestore;
 
-// Test data
-const testSupervisors = [
-  {
-    email: 'supervisor1@test.edu',
-    password: 'Test1234!',
-    name: 'Dr. Davin Powdhar',
-    role: 'supervisor',
-  },
-  {
-    email: 'supervisor2@test.edu',
-    password: 'Test1234!',
-    name: 'Dr. Windale',
-    role: 'supervisor',
-  },
-  {
-    email: 'lecturer@test.edu',
-    password: 'Test1234!',
-    name: 'Dr. Paul',
-    role: 'lecturer',
-  },
+const PASSWORD = 'Test1234!';
+
+// Clearly-fake names so they never collide with the real staff directory.
+const testStaff = [
+  { email: 'supervisor1@test.edu', name: 'Dr. Test Supervisor A', role: 'supervisor' },
+  { email: 'supervisor2@test.edu', name: 'Dr. Test Supervisor B', role: 'supervisor' },
+  { email: 'lecturer@test.edu', name: 'Dr. Test Lecturer', role: 'lecturer' },
 ];
 
+// One student per pipeline stage.
+const ALL_DONE = { intro: true, caseReport: true, discussion: true, conclusion: true, references: true };
 const testStudents = [
   {
-    email: 'student1@test.edu',
-    password: 'Test1234!',
-    name: 'Alice Johnson',
-    caseNumber: 'DMT-2024-001',
-    startYear: 2024,
-    classYear: 4,
-    supervisorEmail: 'supervisor1@test.edu',
+    email: 'student1@test.edu', name: 'Test Student Alice', caseNumber: 'TEST-001',
+    startYear: 2024, classYear: 4, supervisorEmail: 'supervisor1@test.edu',
+    case: { approvalStage: 'pending', sections: { ...ALL_DONE, discussion: false, conclusion: false, references: false } },
   },
   {
-    email: 'student2@test.edu',
-    password: 'Test1234!',
-    name: 'Bob Smith',
-    caseNumber: 'DMT-2024-002',
-    startYear: 2024,
-    classYear: 4,
-    supervisorEmail: 'supervisor1@test.edu',
+    email: 'student2@test.edu', name: 'Test Student Bob', caseNumber: 'TEST-002',
+    startYear: 2024, classYear: 4, supervisorEmail: 'supervisor1@test.edu',
+    case: { approvalStage: 'supervisor', sections: ALL_DONE },
   },
   {
-    email: 'student3@test.edu',
-    password: 'Test1234!',
-    name: 'Carol Davis',
-    caseNumber: 'DMT-2024-003',
-    startYear: 2024,
-    classYear: 3,
-    supervisorEmail: 'supervisor2@test.edu',
+    email: 'student3@test.edu', name: 'Test Student Carol', caseNumber: 'TEST-003',
+    startYear: 2024, classYear: 3, supervisorEmail: 'supervisor2@test.edu',
+    case: { approvalStage: 'lecturer', sections: ALL_DONE, supervisorApproval: { approved: true, approvedAt: new Date() } },
   },
   {
-    email: 'student4@test.edu',
-    password: 'Test1234!',
-    name: 'David Wilson',
-    caseNumber: 'DMT-2024-004',
-    startYear: 2024,
-    classYear: 3,
-    supervisorEmail: 'supervisor2@test.edu',
+    email: 'student4@test.edu', name: 'Test Student Dave', caseNumber: 'TEST-004',
+    startYear: 2024, classYear: 3, supervisorEmail: 'supervisor2@test.edu',
+    case: { approvalStage: 'lecturer', sections: ALL_DONE, supervisorApproval: { approved: true, approvedAt: new Date() } },
   },
 ];
 
-const testCases = [
-  {
-    caseNumber: 'DMT-2024-001',
-    studentName: 'Alice Johnson',
-    approvalStage: 'pending',
-    sections: { intro: true, caseReport: true, discussion: false, conclusion: false, references: false },
-  },
-  {
-    caseNumber: 'DMT-2024-002',
-    studentName: 'Bob Smith',
-    approvalStage: 'supervisor',
-    sections: { intro: true, caseReport: true, discussion: true, conclusion: true, references: true },
-    supervisorApproval: { approved: false },
-  },
-  {
-    caseNumber: 'DMT-2024-003',
-    studentName: 'Carol Davis',
-    approvalStage: 'lecturer',
-    sections: { intro: true, caseReport: true, discussion: true, conclusion: true, references: true },
-    supervisorApproval: { approved: true, approvedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
-  },
-  {
-    caseNumber: 'DMT-2024-004',
-    studentName: 'David Wilson',
-    approvalStage: 'lecturer',
-    sections: { intro: true, caseReport: true, discussion: true, conclusion: true, references: true },
-    supervisorApproval: { approved: true, approvedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
-  },
-];
-
-async function createTestData() {
+// Creates the auth account (or reuses an existing one) with the email
+// already confirmed — the app requires a confirmed email, and @test.edu
+// inboxes don't exist.
+async function ensureAccount({ email, name }) {
   try {
-    console.log('\n🔐 Creating test supervisors...');
-    const supervisorUidByEmail = {};
-    for (const supervisor of testSupervisors) {
-      try {
-        const userRecord = await auth.createUser({
-          email: supervisor.email,
-          password: supervisor.password,
-          displayName: supervisor.name,
-        });
-
-        await db.collection('users').doc(userRecord.uid).set({
-          name: supervisor.name,
-          email: supervisor.email,
-          role: supervisor.role,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        supervisorUidByEmail[supervisor.email] = userRecord.uid;
-        console.log(`  ✅ ${supervisor.role}: ${supervisor.email}`);
-      } catch (error) {
-        if (error.code === 'auth/email-already-exists') {
-          const existing = await auth.getUserByEmail(supervisor.email);
-          supervisorUidByEmail[supervisor.email] = existing.uid;
-          console.log(`  ⚠️  ${supervisor.email} already exists (skipped)`);
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    console.log('\n👥 Creating test students...');
-    for (const student of testStudents) {
-      const supervisor = testSupervisors.find((s) => s.email === student.supervisorEmail);
-      try {
-        const userRecord = await auth.createUser({
-          email: student.email,
-          password: student.password,
-          displayName: student.name,
-        });
-
-        await db.collection('users').doc(userRecord.uid).set({
-          name: student.name,
-          email: student.email,
-          role: 'student',
-          caseNumber: student.caseNumber,
-          startYear: student.startYear,
-          classYear: student.classYear,
-          assignedSupervisorUid: supervisorUidByEmail[student.supervisorEmail],
-          assignedSupervisorName: supervisor?.name,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        console.log(`  ✅ ${student.name} (${student.email}) → assigned to ${supervisor?.name}`);
-      } catch (error) {
-        if (error.code === 'auth/email-already-exists') {
-          console.log(`  ⚠️  ${student.email} already exists (skipped)`);
-        } else {
-          throw error;
-        }
-      }
-    }
-
-    console.log('\n📋 Creating test case records...');
-    for (const testCase of testCases) {
-      const student = testStudents.find((s) => s.caseNumber === testCase.caseNumber);
-      const supervisor = testSupervisors.find((s) => s.email === student?.supervisorEmail);
-      const caseData = {
-        ...testCase,
-        studentUid: 'test-student-uid',
-        submitted: testCase.approvalStage !== 'pending',
-        greenLight: testCase.approvalStage === 'approved',
-        supervisorUid: testCase.approvalStage !== 'pending' ? supervisorUidByEmail[student?.supervisorEmail] : undefined,
-        supervisorName: testCase.approvalStage !== 'pending' ? supervisor?.name : undefined,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      };
-
-      await db.collection('cases').doc(testCase.caseNumber).set(caseData);
-      console.log(`  ✅ ${testCase.caseNumber}: ${testCase.approvalStage}`);
-    }
-
-    console.log('\n✨ Test data created successfully!\n');
-    console.log('📝 Test Accounts:');
-    console.log('\n🔐 Supervisors / Lecturer:');
-    testSupervisors.forEach(s => {
-      console.log(`  • ${s.role}: ${s.email} / ${s.password}`);
-    });
-    console.log('\n👥 Students:');
-    testStudents.forEach(s => {
-      console.log(`  • ${s.name}: ${s.email} / ${s.password} (assigned to ${s.supervisorEmail})`);
-    });
-    console.log('\n📊 Case Statuses:');
-    testCases.forEach(c => {
-      console.log(`  • ${c.caseNumber}: ${c.approvalStage}`);
-    });
-    console.log();
-
-    process.exit(0);
+    const user = await auth.createUser({ email, password: PASSWORD, displayName: name, emailVerified: true });
+    console.log(`  ✅ created ${email}`);
+    return user.uid;
   } catch (error) {
-    console.error('❌ Error creating test data:', error);
-    process.exit(1);
+    if (error.code !== 'auth/email-already-exists') throw error;
+    const existing = await auth.getUserByEmail(email);
+    await auth.updateUser(existing.uid, { password: PASSWORD, emailVerified: true });
+    console.log(`  ↺  reused ${email}`);
+    return existing.uid;
   }
 }
 
-createTestData();
+async function createTestData() {
+  console.log('\n🔐 Staff');
+  const staffByEmail = {};
+  for (const s of testStaff) {
+    const uid = await ensureAccount(s);
+    await db.collection('users').doc(uid).set({
+      name: s.name, email: s.email, role: s.role, createdAt: FieldValue.serverTimestamp(),
+    });
+    // A claimed staff-directory entry, as /api/supervisor-signup creates.
+    const directoryId = `test-${uid}`;
+    await db.collection('staff').doc(directoryId).set({
+      name: s.name, uid, role: s.role, createdAt: FieldValue.serverTimestamp(), claimedAt: FieldValue.serverTimestamp(),
+    });
+    staffByEmail[s.email] = { uid, name: s.name, directoryId };
+  }
+
+  console.log('\n👥 Students and cases');
+  for (const s of testStudents) {
+    const uid = await ensureAccount(s);
+    const sup = staffByEmail[s.supervisorEmail];
+    await db.collection('users').doc(uid).set({
+      name: s.name,
+      email: s.email,
+      role: 'student',
+      caseNumber: s.caseNumber,
+      startYear: s.startYear,
+      classYear: s.classYear,
+      supervisorDirectoryId: sup.directoryId,
+      supervisorDirectoryName: sup.name,
+      assignedSupervisorUid: sup.uid,
+      assignedSupervisorName: sup.name,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    await db.collection('cases').doc(s.caseNumber).set({
+      studentUid: uid,
+      studentName: s.name,
+      caseNumber: s.caseNumber,
+      startYear: s.startYear,
+      classYear: s.classYear,
+      greenLight: false,
+      supervisorUid: sup.uid,
+      supervisorName: sup.name,
+      ...s.case,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    console.log(`     ${s.caseNumber} (${s.case.approvalStage}) → ${sup.name}`);
+  }
+
+  console.log('\n✨ Done. All accounts use the password', PASSWORD);
+  [...testStaff, ...testStudents].forEach((a) => console.log(`  • ${a.email}  ${a.name}`));
+  console.log();
+}
+
+createTestData()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error('❌ Error creating test data:', error);
+    process.exit(1);
+  });

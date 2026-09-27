@@ -8,3 +8,9 @@ node_modules/
 .firebase/
 firebase-debug.log
 firestore-debug.log
+
+# Local test credentials — never commit
+TEST_ACCOUNTS.txt
+
+# macOS
+.DS_Store

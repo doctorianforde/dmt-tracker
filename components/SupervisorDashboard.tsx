@@ -5,10 +5,12 @@ import { useAuth } from '@/lib/auth-context';
 import AuthGuard from '@/components/AuthGuard';
 import SiteFooter from '@/components/SiteFooter';
 import Navbar from '@/components/Navbar';
-import CaseTable, { canApprove, stageOf } from '@/components/CaseTable';
-import DeadlineCalendar, { URGENCY_STYLES, type CalendarEvent } from '@/components/DeadlineCalendar';
-import Avatar from '@/components/ui/Avatar';
+import CaseTable, { canApprove } from '@/components/CaseTable';
+import DeadlineCalendar, { type CalendarEvent } from '@/components/DeadlineCalendar';
 import SectionHeader from '@/components/ui/SectionHeader';
+import AddStudentsPanel from '@/components/supervisor/AddStudentsPanel';
+import StudentRoster from '@/components/supervisor/StudentRoster';
+import AccessLog from '@/components/supervisor/AccessLog';
 import {
   getAllCases,
   getCasesForSupervisor,
@@ -21,12 +23,23 @@ import {
   rejectCase,
   revokeApproval,
   logAccess,
-  getAccessLogs,
 } from '@/lib/firestore';
-import { daysUntil, deadlineUrgency, describeDaysLeft, effectiveDeadline } from '@/lib/deadlines';
+import { effectiveDeadline } from '@/lib/deadlines';
 import { ACCOUNTABILITY_WINDOW_DAYS } from '@/lib/config';
-import { getUnassignedStudents, updateMyStudents, type UnassignedStudent } from '@/lib/api-client';
-import type { CaseRecord, ApprovalStage, UserRole, UserProfile, AccessLogEntry, AccessLogAction, StaffDirectoryEntry } from '@/types';
+import { updateMyStudents, type UnassignedStudent } from '@/lib/api-client';
+import {
+  deadlineCounts,
+  errorMessage,
+  stageOf,
+  withApproval,
+  withCaseSupervisor,
+  withDeadline,
+  withRejection,
+  withRevoke,
+  withStudentSupervisor,
+  type ReviewerRole,
+} from '@/lib/case-state';
+import type { CaseRecord, ApprovalStage, UserRole, UserProfile, AccessLogAction, StaffDirectoryEntry } from '@/types';
 
 // Defined once at module scope — AuthGuard's redirect effect depends on this
 // array by reference, so recreating it on every render would retrigger the
@@ -38,388 +51,6 @@ export default function SupervisorDashboard() {
     <AuthGuard allowedRoles={SUPERVISOR_ROLES}>
       <Dashboard />
     </AuthGuard>
-  );
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : 'Unknown error';
-}
-
-// ── Deadline editor (one per student row) ─────────────────────────────────
-
-function DeadlineCell({
-  value,
-  disabled,
-  onSave,
-}: {
-  value?: string;
-  disabled?: boolean;
-  onSave: (deadline: string | null) => Promise<boolean>;
-}) {
-  // Remounted (via key) whenever the saved value changes, so the draft always
-  // starts from the latest saved deadline.
-  const [draft, setDraft] = useState(value ?? '');
-  const [saving, setSaving] = useState(false);
-  const changed = draft !== (value ?? '');
-
-  const save = async (next: string | null) => {
-    setSaving(true);
-    try {
-      await onSave(next);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const days = value ? daysUntil(value) : null;
-
-  return (
-    <div className="flex flex-col gap-1.5 min-w-[11rem]">
-      <div className="flex items-center gap-1.5">
-        <input
-          type="date"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          disabled={disabled || saving}
-          className="input !py-1.5 !px-2.5 text-xs w-[9.5rem]"
-          aria-label="Submission deadline"
-        />
-        {changed && draft && (
-          <button onClick={() => save(draft)} disabled={saving} className="btn-primary !px-3 !py-1.5 text-xs">
-            {saving ? '…' : 'Set'}
-          </button>
-        )}
-        {changed && (
-          <button onClick={() => setDraft(value ?? '')} disabled={saving} className="btn-ghost !px-2 !py-1.5 text-xs" aria-label="Undo change">
-            ↺
-          </button>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        {value && days !== null && !changed && (
-          <span className={`chip !py-0.5 ${URGENCY_STYLES[deadlineUrgency(days)].pill}`}>{describeDaysLeft(days)}</span>
-        )}
-        {value && !changed && (
-          <button onClick={() => save(null)} disabled={saving || disabled} className="text-[11px] text-muted hover:text-danger">
-            Clear
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Supervisor: add students who have no supervisor yet ───────────────────
-
-function AddStudentsPanel({ onAdded }: { onAdded: (student: UnassignedStudent) => void }) {
-  const [open, setOpen] = useState(false);
-  const [students, setStudents] = useState<UnassignedStudent[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [addingUid, setAddingUid] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-
-  const load = () => {
-    setError(null);
-    setStudents(null);
-    getUnassignedStudents()
-      .then(setStudents)
-      .catch((err: unknown) => setError(errorMessage(err)));
-  };
-
-  const add = async (student: UnassignedStudent) => {
-    setAddingUid(student.uid);
-    setError(null);
-    try {
-      await updateMyStudents(student.uid, 'add');
-      setStudents((prev) => prev?.filter((s) => s.uid !== student.uid) ?? null);
-      onAdded(student);
-    } catch (err: unknown) {
-      setError(`Couldn’t add ${student.name}: ${errorMessage(err)}`);
-    } finally {
-      setAddingUid(null);
-    }
-  };
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => {
-          setOpen(true);
-          load();
-        }}
-        className="btn-primary"
-      >
-        + Add students
-      </button>
-    );
-  }
-
-  const q = search.trim().toLowerCase();
-  const shown = students?.filter(
-    (s) => !q || s.name.toLowerCase().includes(q) || (s.caseNumber ?? '').toLowerCase().includes(q) || (s.email ?? '').toLowerCase().includes(q)
-  );
-
-  return (
-    <div className="card p-5 sm:p-6 mb-4">
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-        <div>
-          <p className="font-bold text-ink">Students without a supervisor</p>
-          <p className="text-sm text-muted mt-0.5">Add a student to your list. You can remove them again until they submit their case.</p>
-        </div>
-        <button onClick={() => setOpen(false)} className="btn-ghost !px-3 !py-1.5 text-xs">Close</button>
-      </div>
-      {error && <p className="text-sm text-danger mb-3" role="alert">{error}</p>}
-      {students === null && !error ? (
-        <p className="text-sm text-muted">Loading…</p>
-      ) : students && students.length === 0 ? (
-        <p className="text-sm text-muted">Every student already has a supervisor.</p>
-      ) : (
-        <>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, email or case number…"
-            className="input !py-2.5 mb-3 max-w-sm"
-            aria-label="Search students"
-          />
-          <ul className="divide-y divide-line border-y border-line max-h-80 overflow-y-auto">
-            {shown?.map((s) => (
-              <li key={s.uid} className="flex items-center gap-3 py-3">
-                <Avatar name={s.name} photoURL={s.photoURL} size={34} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-ink truncate">{s.name}</p>
-                  <p className="text-xs text-muted truncate">
-                    {[s.caseNumber, s.email].filter(Boolean).join(' · ') || 'No case yet'}
-                  </p>
-                </div>
-                <button onClick={() => add(s)} disabled={addingUid !== null} className="btn-secondary !px-3 !py-1.5 text-xs">
-                  {addingUid === s.uid ? 'Adding…' : 'Add'}
-                </button>
-              </li>
-            ))}
-            {shown?.length === 0 && <li className="py-3 text-sm text-muted">No students match your search.</li>}
-          </ul>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ── Student roster: supervisor assignment (Lecturer) and deadlines ────────
-
-function StudentRoster({
-  students,
-  staff,
-  casesByStudent,
-  isLecturer,
-  onAssign,
-  onSetDeadline,
-  onRemove,
-}: {
-  students: UserProfile[];
-  staff: StaffDirectoryEntry[];
-  casesByStudent: Map<string, CaseRecord>;
-  isLecturer: boolean;
-  onAssign: (student: UserProfile, directoryId: string) => Promise<boolean>;
-  onSetDeadline: (student: UserProfile, deadline: string | null) => Promise<boolean>;
-  // Supervisor only: release a student they added (draft cases only).
-  onRemove?: (student: UserProfile) => Promise<boolean>;
-}) {
-  const [savingUid, setSavingUid] = useState<string | null>(null);
-
-  if (students.length === 0) {
-    return (
-      <div className="card text-center py-14 px-6">
-        <p className="display text-2xl text-ink">No students yet</p>
-        <p className="text-sm text-muted mt-1">
-          {isLecturer ? 'Students appear here once they register.' : 'Add students with the button above, or they’ll appear here when they choose you.'}
-        </p>
-      </div>
-    );
-  }
-
-  const th = 'text-left px-4 py-3 eyebrow text-muted';
-
-  return (
-    <div className="card overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-line bg-surface2/50">
-              <th className={`${th} pl-5`}>Student</th>
-              <th className={th}>Case #</th>
-              {isLecturer && <th className={th}>Supervisor</th>}
-              <th className={th}>Deadline</th>
-              <th className={th}>Extension request</th>
-              {onRemove && <th className={th}><span className="sr-only">Actions</span></th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {students.map((student) => {
-              const rec = casesByStudent.get(student.uid);
-              const deadline = effectiveDeadline(student, rec);
-              return (
-                <tr key={student.uid} className="align-top">
-                  <td className="pl-5 pr-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar name={student.name} photoURL={student.photoURL || undefined} size={36} />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-ink truncate">{student.name}</p>
-                        <p className="text-xs text-muted truncate">{student.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-xs text-muted font-mono whitespace-nowrap">{student.caseNumber ?? '—'}</td>
-                  {isLecturer && (
-                    <td className="px-4 py-4">
-                      <select
-                        value={student.supervisorDirectoryId ?? ''}
-                        disabled={savingUid === student.uid}
-                        onChange={async (e) => {
-                          setSavingUid(student.uid);
-                          await onAssign(student, e.target.value);
-                          setSavingUid(null);
-                        }}
-                        className="input !py-1.5 !px-2.5 text-xs min-w-[11rem]"
-                        aria-label={`Supervisor for ${student.name}`}
-                      >
-                        <option value="">— Unassigned —</option>
-                        {staff.map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}{s.uid ? '' : ' (not signed up yet)'}</option>
-                        ))}
-                        {/* Legacy assignment made before the directory existed. */}
-                        {!student.supervisorDirectoryId && student.assignedSupervisorName && (
-                          <option value="" disabled>{student.assignedSupervisorName} (legacy)</option>
-                        )}
-                      </select>
-                      {student.supervisorDirectoryId && !student.assignedSupervisorUid && (
-                        <p className="text-[11px] text-muted mt-1">Links automatically when they sign up</p>
-                      )}
-                    </td>
-                  )}
-                  <td className="px-4 py-4">
-                    <DeadlineCell
-                      key={deadline ?? 'none'}
-                      value={deadline}
-                      onSave={(d) => onSetDeadline(student, d)}
-                    />
-                    {!student.deadline && rec?.customDeadline && (
-                      <p className="text-[11px] text-muted mt-1 max-w-[12rem]">Set by the student before deadlines moved to staff — set it here to confirm.</p>
-                    )}
-                    {student.deadline && student.deadlineSetByName && (
-                      <p className="text-[11px] text-muted mt-1">by {student.deadlineSetByName}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 max-w-[16rem]">
-                    {rec?.extensionReason ? (
-                      <p className="text-xs text-ink/80 line-clamp-3" title={rec.extensionReason}>“{rec.extensionReason}”</p>
-                    ) : (
-                      <span className="text-xs text-muted">—</span>
-                    )}
-                  </td>
-                  {onRemove && (
-                    <td className="px-4 py-4 text-right">
-                      {(!rec || stageOf(rec) === 'pending') && (
-                        <button
-                          onClick={async () => {
-                            if (!window.confirm(`Remove ${student.name} from your students?`)) return;
-                            setSavingUid(student.uid);
-                            await onRemove(student);
-                            setSavingUid(null);
-                          }}
-                          disabled={savingUid === student.uid}
-                          className="text-xs text-muted hover:text-danger whitespace-nowrap"
-                        >
-                          {savingUid === student.uid ? 'Removing…' : 'Remove'}
-                        </button>
-                      )}
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ── Access log (Lecturer) ─────────────────────────────────────────────────
-
-const ACTION_LABELS: Record<AccessLogAction, string> = {
-  login: 'Signed in',
-  view_cases: 'Viewed case list',
-  approve: 'Approved case',
-  reject: 'Rejected case',
-  revoke: 'Revoked approval',
-  assign_supervisor: 'Assigned supervisor',
-  set_deadline: 'Set deadline',
-};
-
-function AccessLog() {
-  const [logs, setLogs] = useState<AccessLogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setLogs(await getAccessLogs());
-    } catch (err: unknown) {
-      setError('Failed to load access log: ' + errorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const th = 'text-left px-4 py-3 eyebrow text-muted';
-
-  return (
-    <div className="card overflow-hidden">
-      <div className="px-5 py-3 border-b border-line flex items-center justify-between">
-        <p className="text-sm text-muted">Logins, case views, approvals and deadline changes</p>
-        <button onClick={load} disabled={loading} className="btn-secondary !px-3 !py-1.5 text-xs">Refresh</button>
-      </div>
-      {error && <div className="px-5 py-3 bg-danger/10 text-xs text-danger">{error}</div>}
-      {loading ? (
-        <div className="px-5 py-8 text-center text-sm text-muted">Loading…</div>
-      ) : logs.length === 0 ? (
-        <div className="px-5 py-8 text-center text-sm text-muted">No activity recorded yet</div>
-      ) : (
-        <div className="overflow-x-auto max-h-96 overflow-y-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-surface">
-              <tr className="border-b border-line">
-                <th className={`${th} pl-5`}>Time</th>
-                <th className={th}>Who</th>
-                <th className={th}>Action</th>
-                <th className={th}>Target</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {logs.map((log) => (
-                <tr key={log.id}>
-                  <td className="pl-5 pr-4 py-2.5 text-xs text-muted whitespace-nowrap">
-                    {log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <p className="text-ink">{log.actorName}</p>
-                    <p className="text-xs text-muted capitalize">{log.actorRole}</p>
-                  </td>
-                  <td className="px-4 py-2.5 text-ink/80">{ACTION_LABELS[log.action] ?? log.action}</td>
-                  <td className="px-4 py-2.5 text-xs text-muted">{log.targetLabel ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -551,50 +182,24 @@ function Dashboard() {
     return studentName ? `${studentName} (${caseNumber})` : caseNumber;
   };
 
-  const handleApprove = (caseNumber: string, role: 'supervisor' | 'lecturer', nextStage: ApprovalStage) =>
+  const handleApprove = (caseNumber: string, role: ReviewerRole, nextStage: ApprovalStage) =>
     attempt('approve this case', async () => {
       await approveCase(caseNumber, role, nextStage);
-      setCases((prev) =>
-        prev.map((c) =>
-          c.caseNumber === caseNumber
-            ? {
-                ...c,
-                approvalStage: nextStage,
-                greenLight: nextStage === 'approved',
-                [role === 'supervisor' ? 'supervisorApproval' : 'lecturerApproval']: { approved: true, approvedAt: new Date() },
-              }
-            : c
-        )
-      );
+      setCases((prev) => withApproval(prev, caseNumber, role, nextStage));
       log('approve', caseNumber, caseLabel(caseNumber));
     });
 
-  const handleReject = (caseNumber: string, role: 'supervisor' | 'lecturer', reason: string) =>
+  const handleReject = (caseNumber: string, role: ReviewerRole, reason: string) =>
     attempt('reject this case', async () => {
       await rejectCase(caseNumber, role, reason);
-      setCases((prev) =>
-        prev.map((c) =>
-          c.caseNumber === caseNumber
-            ? {
-                ...c,
-                [role === 'supervisor' ? 'supervisorApproval' : 'lecturerApproval']: {
-                  approved: false,
-                  rejectionReason: reason,
-                  rejectedAt: new Date(),
-                },
-              }
-            : c
-        )
-      );
+      setCases((prev) => withRejection(prev, caseNumber, role, reason));
       log('reject', caseNumber, caseLabel(caseNumber));
     });
 
   const handleRevoke = (caseNumber: string) =>
     attempt('revoke approval', async () => {
       await revokeApproval(caseNumber);
-      setCases((prev) =>
-        prev.map((c) => (c.caseNumber === caseNumber ? { ...c, greenLight: false, approvalStage: 'lecturer' } : c))
-      );
+      setCases((prev) => withRevoke(prev, caseNumber));
       log('revoke', caseNumber, caseLabel(caseNumber));
     });
 
@@ -602,30 +207,9 @@ function Dashboard() {
     attempt(`update ${student.name}’s supervisor`, async () => {
       const entry = staff.find((s) => s.id === directoryId) ?? null;
       await setSupervisorChoice(student.uid, entry, student.caseNumber);
-      const accountUid = entry?.uid;
-      const accountName = entry?.uid ? entry.name : undefined;
-      setStudents((prev) =>
-        prev.map((s) =>
-          s.uid === student.uid
-            ? {
-                ...s,
-                supervisorDirectoryId: entry?.id,
-                supervisorDirectoryName: entry?.name,
-                assignedSupervisorUid: accountUid,
-                assignedSupervisorName: accountName,
-              }
-            : s
-        )
-      );
-      if (student.caseNumber) {
-        setCases((prev) =>
-          prev.map((c) =>
-            c.caseNumber === student.caseNumber
-              ? { ...c, supervisorUid: accountUid, supervisorName: accountName }
-              : c
-          )
-        );
-      }
+      setStudents((prev) => withStudentSupervisor(prev, student.uid, entry));
+      const { caseNumber } = student;
+      if (caseNumber) setCases((prev) => withCaseSupervisor(prev, caseNumber, entry));
       log('assign_supervisor', student.uid, `${student.name} → ${entry?.name ?? 'unassigned'}`);
     });
 
@@ -646,13 +230,7 @@ function Dashboard() {
     attempt(`set ${student.name}’s deadline`, async () => {
       if (!userProfile) return;
       await setStudentDeadline(student.uid, deadline, userProfile.name);
-      setStudents((prev) =>
-        prev.map((s) =>
-          s.uid === student.uid
-            ? { ...s, deadline: deadline ?? undefined, deadlineSetByName: deadline ? userProfile.name : undefined }
-            : s
-        )
-      );
+      setStudents((prev) => withDeadline(prev, student.uid, deadline, userProfile.name));
       log('set_deadline', student.uid, `${student.name}: ${deadline ?? 'cleared'}`);
     });
 
@@ -661,12 +239,7 @@ function Dashboard() {
     canApprove(stageOf(c), { isSupervisor, isLecturer, uid: userProfile?.uid }, c)
   ).length;
   const approvedCount = cases.filter((c) => stageOf(c) === 'approved').length;
-  const dueSoon = Object.values(deadlines).filter((d) => {
-    if (!d) return false;
-    const days = daysUntil(d);
-    return days >= 0 && days <= ACCOUNTABILITY_WINDOW_DAYS;
-  }).length;
-  const overdue = Object.values(deadlines).filter((d) => d && daysUntil(d) < 0).length;
+  const { dueSoon, overdue } = deadlineCounts(Object.values(deadlines), ACCOUNTABILITY_WINDOW_DAYS);
 
   const stats = [
     { label: isLecturer ? 'Students' : 'Your students', value: students.length, tone: 'text-ink' },

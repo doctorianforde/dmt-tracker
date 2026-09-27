@@ -1,235 +1,83 @@
-# Supervisor Dashboard Test Guide
+# VIS — Test Guide
 
-## Quick Test Setup
+## Automated tests
 
-### Invite Codes
-
-Check your `.env.local` for:
-
-```
-NEXT_PUBLIC_CODE_SUPERVISOR
-NEXT_PUBLIC_CODE_DRPAUL
+```bash
+npm test             # unit + component tests (no setup needed)
+npm run test:rules   # Firestore security rules, on the local emulator
 ```
 
-### Test Accounts to Create
+`test:rules` starts the Firestore emulator, runs
+[rules-tests/firestore.rules.test.ts](rules-tests/firestore.rules.test.ts)
+against [firestore.rules](firestore.rules), then shuts the emulator down. It
+uses a throwaway `demo-vis` project and never touches production data. It
+needs Java 21 on your `PATH`:
 
-#### Supervisors (via `/supervisor-signup`)
+```bash
+brew install openjdk@21
+export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"   # add to ~/.zshrc to keep it
+```
 
-1. **Supervisor 1**
-   - Email: `supervisor1@test.edu`
-   - Password: `Test1234!`
-   - Name: `Dr. Davin Powdhar`
-   - Invite Code: `NEXT_PUBLIC_CODE_SUPERVISOR`
+Run both suites before any change to the data model or the rules, and before
+`npm run deploy:rules`.
 
-2. **Supervisor 2**
-   - Email: `supervisor2@test.edu`
-   - Password: `Test1234!`
-   - Name: `Dr. Windale`
-   - Invite Code: `NEXT_PUBLIC_CODE_SUPERVISOR`
+## Test accounts
 
-3. **Dr. Paul**
-   - Email: `drpaul@test.edu`
-   - Password: `Test1234!`
-   - Name: `Dr. Paul`
-   - Invite Code: `NEXT_PUBLIC_CODE_DRPAUL`
+```bash
+npm run seed:test
+```
 
-#### Students (via main signup `/`)
+This command creates the accounts below with their emails already confirmed.
+All of them use the password `Test1234!`. It is safe to re-run, and each run
+resets these accounts' profiles and cases.
 
-1. **Student 1 - Pending**
-   - Email: `student1@test.edu`
-   - Password: `Test1234!`
-   - Name: `Alice Johnson`
-   - After signup, go to `/student` and enter:
-     - Case Number: `DMT-2024-001`
-     - Start Year: `2024`
-     - Class Year: `4`
-     - Primary Supervisor: `Dr. Davin Powdhar`
-     - Mark sections: 2/5 complete
-     - Save
+| Email | Role | Notes |
+|---|---|---|
+| `supervisor1@test.edu` | Supervisor | Dr. Test Supervisor A: Alice, Bob |
+| `supervisor2@test.edu` | Supervisor | Dr. Test Supervisor B: Carol, Dave |
+| `lecturer@test.edu` | Lecturer | Dr. Test Lecturer |
+| `student1@test.edu` | Student | `TEST-001`, draft (`pending`) |
+| `student2@test.edu` | Student | `TEST-002`, waiting on supervisor |
+| `student3@test.edu` | Student | `TEST-003`, waiting on lecturer |
+| `student4@test.edu` | Student | `TEST-004`, waiting on lecturer |
 
-2. **Student 2 - At Supervisor 1**
-   - Email: `student2@test.edu`
-   - Password: `Test1234!`
-   - Name: `Bob Smith`
-   - After signup, go to `/student` and enter:
-     - Case Number: `DMT-2024-002`
-     - Start Year: `2024`
-     - Class Year: `4`
-     - Primary Supervisor: `Dr. Davin Powdhar`
-     - Secondary Supervisor: `Dr. Windale`
-     - Mark sections: All 5/5 complete
-     - Save, then click **Submit for Review**
+Keep any local notes of credentials in `TEST_ACCOUNTS.txt`. Git ignores that
+file, so it is never committed. **Delete every test account before handing
+the app over.**
 
-3. **Student 3 - At Supervisor 2**
-   - Email: `student3@test.edu`
-   - Password: `Test1234!`
-   - Name: `Carol Davis`
-   - After signup, go to `/student` and enter:
-     - Case Number: `DMT-2024-003`
-     - Start Year: `2024`
-     - Class Year: `3`
-     - Primary Supervisor: `Dr. Davin Powdhar`
-     - Secondary Supervisor: `Dr. Windale`
-     - Mark sections: All 5/5 complete
-     - Save, then click **Submit for Review**
-   - Sign in as **Dr. Davin Powdhar** and approve the case to move it to Supervisor 2
+## Manual walkthrough
 
-4. **Student 4 - At Dr. Paul**
-   - Email: `student4@test.edu`
-   - Password: `Test1234!`
-   - Name: `David Wilson`
-   - After signup, go to `/student` and enter:
-     - Case Number: `DMT-2024-004`
-     - Start Year: `2024`
-     - Class Year: `3`
-     - Primary Supervisor: `Dr. Davin Powdhar`
-     - Secondary Supervisor: `Dr. Windale`
-     - Mark sections: All 5/5 complete
-     - Save, then click **Submit for Review**
-   - Sign in as **Dr. Davin Powdhar** and approve the case
-   - Sign in as **Dr. Windale** and approve the case
+### 1. Student: draft and submit (`student1`)
+1. Sign in on `/`. You land on `/student`.
+2. Under **Case sections**, tick a section and save.
+3. Try to edit the case number. It should be locked ("Locked after first save").
+4. Change your supervisor to Dr. Test Supervisor B, then back to A. This works while the case is a draft.
+5. Click **Submit for review**. The pipeline moves to *Supervisor*, and the supervisor picker locks.
 
----
+### 2. Supervisor: review (`supervisor1`)
+1. Sign in. You land on `/supervisor`, where **Case reviews** shows only Alice and Bob.
+2. **Reject** Bob's case with a reason. The case stays at *Supervisor* and shows the reason.
+3. Click **Approve & Send to Lecturer** on Alice's case. It moves to *Lecturer*.
+4. Under **Your students**, set a deadline for one student. It appears on the **Deadline calendar** and on the student's dashboard.
+5. Sign in as `supervisor2`: Alice and Bob should not be visible.
 
-## Manual Case Status Setup
+### 3. Student: resubmit (`student2`)
+1. You should see the rejection reason. Tick another section, save, then click **Mark as ready for re-review**.
+2. As `supervisor1`, Bob's case is flagged as resubmitted. Approve it.
 
-If you prefer to set up cases manually in Firestore instead of clicking through the UI:
+### 4. Lecturer: final approval (`lecturer`)
+1. **Case reviews** lists every case. Click **Grant Final Approval** on Carol's case: the case shows *Approved* and the green light.
+2. Revoke the approval. The case returns to *Lecturer*.
+3. Under **Students & supervisors**, move Dave to Dr. Test Supervisor A. `supervisor1` should now see Dave's case.
+4. **Access log** shows the sign-ins, approvals, rejections and assignments from the steps above.
 
-1. Go to [Firebase Console](https://console.firebase.google.com)
-2. Select your project
-3. Go to **Firestore Database**
-4. Navigate to **Collections → cases**
+### 5. Staff sign-up (`/supervisor-signup`)
+1. Choose Supervisor, pick a name from the directory, and enter the supervisor invite code. The account is created, and the name disappears from the list for later sign-ups.
+2. Choose Lecturer but enter the supervisor code. You should see an error explaining that it's the wrong code.
+3. Enter a wrong code. You should see "Incorrect invite code".
 
-### Case 1: DMT-2024-001 (Pending - Student Not Submitted)
-- **approvalStage**: `pending`
-- **sections**: All `false` or partial
-
-### Case 2: DMT-2024-002 (Supervisor 1 Review)
-- **approvalStage**: `supervisor1`
-- **sections**: All `true`
-- **supervisor1Uid**: `<Dr. Davin's UID>`
-- **supervisor1Name**: `Dr. Davin Powdhar`
-- **supervisor1Approval**:
-  ```
-  { approved: false }
-  ```
-
-### Case 3: DMT-2024-003 (Supervisor 2 Review)
-- **approvalStage**: `supervisor2`
-- **sections**: All `true`
-- **supervisor1Uid**: `<Dr. Davin's UID>`
-- **supervisor1Name**: `Dr. Davin Powdhar`
-- **supervisor2Uid**: `<Dr. Windale's UID>`
-- **supervisor2Name**: `Dr. Windale`
-- **supervisor1Approval**:
-  ```
-  { approved: true, approvedAt: <timestamp> }
-  ```
-
-### Case 4: DMT-2024-004 (Dr. Paul Review)
-- **approvalStage**: `drpaul`
-- **sections**: All `true`
-- **supervisor1Uid**: `<Dr. Davin's UID>`
-- **supervisor1Name**: `Dr. Davin Powdhar`
-- **supervisor2Uid**: `<Dr. Windale's UID>`
-- **supervisor2Name**: `Dr. Windale`
-- **supervisor1Approval**:
-  ```
-  { approved: true, approvedAt: <timestamp> }
-  ```
-- **supervisor2Approval**:
-  ```
-  { approved: true, approvedAt: <timestamp> }
-  ```
-
----
-
-## Testing the Supervisor Dashboard
-
-### After Creating Test Accounts:
-
-#### **Test as Supervisor 1 (Dr. Davin Powdhar)**
-
-1. Sign in to `/` with `supervisor1@test.edu` / `Test1234!`
-2. You'll be redirected to `/supervisor`
-3. You should see:
-   - Generic Supervisor banner
-   - 4 case records in the table
-   - **For DMT-2024-001**: Mark as "Pending" with no action button
-   - **For DMT-2024-002**: Show approval button (ready to approve)
-   - **For DMT-2024-003**: Show "Waiting for approval" (already approved by you)
-   - **For DMT-2024-004**: Show "Waiting for approval" (already approved by you)
-
-#### **Test as Supervisor 2 (Dr. Windale)**
-
-1. Sign in with `supervisor2@test.edu` / `Test1234!`
-2. Go to `/supervisor`
-3. You should see:
-   - Generic Supervisor banner
-   - 4 case records
-   - **For DMT-2024-001 & 002**: No action buttons (not at your stage yet)
-   - **For DMT-2024-003**: Show approval button
-   - **For DMT-2024-004**: Show "Waiting for approval" (already approved by you)
-
-#### **Test as Dr. Paul**
-
-1. Sign in with `drpaul@test.edu` / `Test1234!`
-2. Go to `/supervisor`
-3. You should see:
-   - Dr. Paul banner
-   - 4 case records
-   - **For DMT-2024-001, 002, 003**: No action buttons (both supervisors haven't approved yet)
-   - **For DMT-2024-004**: Show "✅ Grant Final Approval" button
-
----
-
-## What You're Testing
-
-### ✅ Tiered Approval System
-- [x] Supervisor 1 must approve first
-- [x] Supervisor 2 can only act after Supervisor 1
-- [x] Dr. Paul can only act after both supervisors
-- [x] UI shows role-appropriate buttons only
-
-### ✅ Student Submission
-- [x] Students select Supervisor 1 (required) and Supervisor 2 (optional)
-- [x] Students click "Submit for Review" to move case to Supervisor 1
-- [x] Progress pipeline shows current stage
-
-### ✅ Visibility
-- [x] All supervisors see all student cases
-- [x] Approval status clearly labeled
-- [x] Role-specific instructions in banner
-
-### ✅ Approval Tracking
-- [x] Shows approval timestamps
-- [x] Records per-supervisor approval objects
-- [x] Shows progression through stages
-
----
-
-## Expected Visual Indicators
-
-### Status Badges
-- 🔘 **Pending** (gray) - Awaiting student submission
-- 🔘 **Supervisor 1** (orange) - Awaiting Supervisor 1 approval
-- 🔘 **Supervisor 2** (amber) - Supervisor 1 approved, awaiting Supervisor 2
-- 🔘 **Dr. Paul** (yellow) - Both supervisors approved, awaiting Dr. Paul
-- 🔘 **Approved** (green) - Final approval granted
-
----
-
-## Troubleshooting
-
-**Can't see supervisor dashboard?**
-- Make sure you've created the supervisor account via `/supervisor-signup`
-- Check that the invite codes in `.env.local` match what you used
-
-**Cases not appearing?**
-- Make sure student accounts were created first
-- Then manually create case records in Firestore with the student UIDs
-
-**Buttons not showing?**
-- Check the `approvalStage` in Firestore matches the logic
-- Verify `supervisor1Approval.approved` is `true` for Supervisor 2 to see buttons
-- Check that `supervisor1Uid`/`supervisor2Uid` match the signed-in supervisor's UID
+### 6. Accounts
+- **Sign-up:** a new student sign-up shows the verify-email screen until the link is clicked.
+- **Forgot password:** the "Forgot password?" link on `/` sends a reset email.
+- **Change password:** works from the dashboard.
+- **Themes:** switching theme persists after a reload.

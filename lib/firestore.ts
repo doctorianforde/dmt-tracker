@@ -247,11 +247,15 @@ export async function rejectCase(
   });
 }
 
+// Sends an approved case back to the Lecturer's stage. Their approval is
+// cleared too — otherwise the case would show as already approved at that
+// stage, with no way to approve or reject it again.
 export async function revokeApproval(caseNumber: string): Promise<void> {
   const db = getSafeDb();
   await updateDoc(doc(db, 'cases', caseNumber), {
     greenLight: false,
     approvalStage: 'lecturer',
+    lecturerApproval: deleteField(),
     updatedAt: serverTimestamp(),
   });
 }

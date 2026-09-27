@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { CaseRecord, ApprovalStage } from '@/types';
 import { daysUntil, deadlineUrgency, describeDaysLeft, formatDeadline } from '@/lib/deadlines';
 import { URGENCY_STYLES } from '@/components/DeadlineCalendar';
+import { stageOf } from '@/lib/case-state';
 
 // Handlers may return false to signal the action failed (the dashboard shows
 // the error); the table then keeps e.g. a typed rejection reason in place.
@@ -88,9 +89,6 @@ export function canApprove(stage: ApprovalStage, viewer: Viewer, record: CaseRec
   return false;
 }
 
-export function stageOf(record: CaseRecord): ApprovalStage {
-  return record.approvalStage ?? (record.greenLight ? 'approved' : 'pending');
-}
 
 function getStageButtonLabel(next: ApprovalStage): string {
   if (next === 'lecturer') return '✅ Approve & Send to Lecturer';

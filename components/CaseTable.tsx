@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { CaseRecord, ApprovalStage } from '@/types';
 import { daysUntil, deadlineUrgency, describeDaysLeft, formatDeadline } from '@/lib/deadlines';
 import { URGENCY_STYLES } from '@/components/DeadlineCalendar';
-import { stageOf } from '@/lib/case-state';
+import { stageOf, SECTION_KEYS, SECTION_LABELS } from '@/lib/case-state';
 
 // Handlers may return false to signal the action failed (the dashboard shows
 // the error); the table then keeps e.g. a typed rejection reason in place.
@@ -22,6 +22,8 @@ interface Props {
   onApprove?: (caseNumber: string, role: 'supervisor' | 'lecturer', nextStage: ApprovalStage) => ActionResult;
   onReject?: (caseNumber: string, role: 'supervisor' | 'lecturer', reason: string) => ActionResult;
   onRevoke?: (caseNumber: string) => ActionResult;
+  // Approved cases per student uid, shown under each student's name.
+  approvedCounts?: Record<string, number>;
 }
 
 // Who is acting depends on the stage being reviewed, not on the viewer's
@@ -44,14 +46,6 @@ function isResubmitted(record: CaseRecord, stage: ApprovalStage): boolean {
   return !approval.rejectedAt || record.resubmittedAt.getTime() > approval.rejectedAt.getTime();
 }
 
-const SECTION_KEYS = ['intro', 'caseReport', 'discussion', 'conclusion', 'references'] as const;
-const SECTION_LABELS: Record<string, string> = {
-  intro: 'Intro',
-  caseReport: 'Report',
-  discussion: 'Discussion',
-  conclusion: 'Conclusion',
-  references: 'References',
-};
 
 export const STAGE_STYLES: Record<ApprovalStage, { label: string; pill: string; dot: string }> = {
   pending: { label: 'Draft', pill: 'bg-ink/5 text-muted', dot: 'bg-muted' },
@@ -96,7 +90,7 @@ function getStageButtonLabel(next: ApprovalStage): string {
   return 'Advance';
 }
 
-export default function CaseTable({ cases, isLecturer = false, isSupervisor = false, currentUid, deadlines, onApprove, onReject, onRevoke }: Props) {
+export default function CaseTable({ cases, isLecturer = false, isSupervisor = false, currentUid, deadlines, onApprove, onReject, onRevoke, approvedCounts }: Props) {
   const [search, setSearch] = useState('');
   const [rejectingCase, setRejectingCase] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -201,6 +195,9 @@ export default function CaseTable({ cases, isLecturer = false, isSupervisor = fa
                   <td className="pl-5 pr-4 py-4">
                     <p className="font-semibold text-ink">{rec.studentName}</p>
                     <p className="text-xs text-muted mt-0.5">Y{rec.classYear} · {rec.startYear}{rec.supervisorName ? ` · ${rec.supervisorName}` : ''}</p>
+                    {approvedCounts && (
+                      <ApprovedCount count={approvedCounts[rec.studentUid] ?? 0} />
+                    )}
                   </td>
                   <td className="px-4 py-4">
                     <span className="font-mono text-xs bg-ink/5 text-ink px-2 py-1 rounded">{rec.caseNumber}</span>
@@ -208,10 +205,10 @@ export default function CaseTable({ cases, isLecturer = false, isSupervisor = fa
                   <td className="px-4 py-4">
                     <div className="flex flex-col items-center gap-1.5">
                       <div className="flex items-center gap-0.5">
-                        {SECTION_KEYS.map((key) => (
+                        {SECTION_KEYS.map((key, i) => (
                           <div
                             key={key}
-                            title={SECTION_LABELS[key]}
+                            title={`${i + 1}. ${SECTION_LABELS[key]}${rec.sections?.[key] ? ' — done' : ''}`}
                             className={`w-2.5 h-2.5 rounded-full ${rec.sections?.[key] ? 'bg-accent' : 'bg-ink/10'}`}
                           />
                         ))}
@@ -326,6 +323,38 @@ export default function CaseTable({ cases, isLecturer = false, isSupervisor = fa
       {filtered.length === 0 && (
         <div className="text-center py-10 text-muted text-sm">No results match your search</div>
       )}
+      <SectionsKey />
+    </div>
+  );
+}
+
+export function ApprovedCount({ count }: { count: number }) {
+  return (
+    <span className={`chip mt-1.5 !py-0.5 ${count ? 'bg-ok/15 text-ok' : 'bg-ink/5 text-muted'}`}>
+      {count} approved case{count === 1 ? '' : 's'}
+    </span>
+  );
+}
+
+// Explains the five dots and the "n/5" count in the Sections column.
+function SectionsKey() {
+  return (
+    <div className="px-5 py-4 border-t border-line bg-surface2/40">
+      <p className="eyebrow text-muted mb-2">Key: Sections</p>
+      <ol className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-ink/80" aria-label="Sections key">
+        {SECTION_KEYS.map((key, i) => (
+          <li key={key} className="flex items-center gap-1.5">
+            <span className="w-4 h-4 rounded-full bg-accent/15 text-accent text-[10px] font-bold flex items-center justify-center tabular-nums">
+              {i + 1}
+            </span>
+            {SECTION_LABELS[key]}
+          </li>
+        ))}
+      </ol>
+      <p className="text-xs text-muted mt-2">
+        Each dot is one part of the case report, in this order, left to right. A filled dot means the student has
+        marked that part complete; “3/5” means three of the five parts are complete (in any order).
+      </p>
     </div>
   );
 }

@@ -15,6 +15,7 @@ vi.mock('@/components/SiteFooter', () => ({ default: () => null }));
 vi.mock('@/components/ui/AvatarUpload', () => ({ default: () => null }));
 vi.mock('@/lib/firestore', () => ({
   getCaseRecord: vi.fn(),
+  getCasesForStudent: vi.fn(),
   saveCaseRecord: vi.fn(),
   submitCaseForReview: vi.fn(),
   resubmitCase: vi.fn(),
@@ -69,6 +70,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocked.getStaffDirectory.mockResolvedValue(STAFF);
   mocked.getCaseRecord.mockResolvedValue(null);
+  mocked.getCasesForStudent.mockResolvedValue([]);
   mocked.saveCaseRecord.mockResolvedValue();
   mocked.updateUserProfile.mockResolvedValue();
   mocked.submitCaseForReview.mockResolvedValue();
@@ -179,5 +181,83 @@ describe('StudentDashboard: after review', () => {
 
     expect(await screen.findByText('Case approved 🎉')).toBeInTheDocument();
     expect(screen.queryByText('Submit for review →')).not.toBeInTheDocument();
+  });
+});
+
+describe('StudentDashboard: several cases', () => {
+  const approvedC1 = caseRecord({ approvalStage: 'approved', greenLight: true, lecturerApproval: { approved: true } });
+
+  it('shows how many cases are approved, with earlier cases listed', async () => {
+    signInAs(student({ caseNumber: 'C2' }));
+    const current = caseRecord({ caseNumber: 'C2' });
+    mocked.getCaseRecord.mockResolvedValue(current);
+    mocked.getCasesForStudent.mockResolvedValue([approvedC1, current]);
+    render(<StudentDashboard />);
+
+    expect(await screen.findByTestId('approved-count')).toHaveTextContent('1 approved case');
+    expect(screen.getByText('Your cases')).toBeInTheDocument();
+    expect(screen.getByText('C1')).toBeInTheDocument();
+  });
+
+  it('starts the next case once the current one is approved', async () => {
+    signInAs(student({ caseNumber: 'C1' }));
+    mocked.getCaseRecord.mockResolvedValue(approvedC1);
+    mocked.getCasesForStudent.mockResolvedValue([approvedC1]);
+    render(<StudentDashboard />);
+
+    fireEvent.click(await screen.findByText('Start your next case →'));
+    const input = screen.getByLabelText('Case number');
+    expect(input).toBeEnabled();
+    expect(input).toHaveValue('');
+
+    fireEvent.change(input, { target: { value: 'C2' } });
+    fireEvent.click(screen.getByText('Save progress'));
+
+    await waitFor(() => expect(mocked.updateUserProfile).toHaveBeenCalledWith('stu-1', expect.objectContaining({ caseNumber: 'C2' })));
+    expect(mocked.saveCaseRecord).toHaveBeenCalledWith('C2', expect.objectContaining({
+      caseNumber: 'C2', approvalStage: 'pending', greenLight: false, supervisorUid: 'sup-a',
+      sections: expect.objectContaining({ intro: false }),
+    }));
+  });
+
+  it('won’t reuse one of their own case numbers', async () => {
+    signInAs(student({ caseNumber: 'C1' }));
+    mocked.getCaseRecord.mockResolvedValue(approvedC1);
+    mocked.getCasesForStudent.mockResolvedValue([approvedC1]);
+    render(<StudentDashboard />);
+
+    fireEvent.click(await screen.findByText('Start your next case →'));
+    fireEvent.change(screen.getByLabelText('Case number'), { target: { value: 'C1' } });
+    fireEvent.click(screen.getByText('Save progress'));
+
+    expect(await screen.findByText('You’ve already used case number C1. Enter a new one.')).toBeInTheDocument();
+    expect(mocked.saveCaseRecord).not.toHaveBeenCalled();
+  });
+
+  it('explains a case number that belongs to someone else', async () => {
+    signInAs(student({ caseNumber: 'C1' }));
+    mocked.getCaseRecord.mockResolvedValue(approvedC1);
+    mocked.getCasesForStudent.mockResolvedValue([approvedC1]);
+    mocked.saveCaseRecord.mockRejectedValue(Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' }));
+    render(<StudentDashboard />);
+
+    fireEvent.click(await screen.findByText('Start your next case →'));
+    fireEvent.change(screen.getByLabelText('Case number'), { target: { value: 'TAKEN' } });
+    fireEvent.click(screen.getByText('Save progress'));
+
+    expect(await screen.findByText('That case number is already in use. Check it and try again.')).toBeInTheDocument();
+  });
+
+  it('can cancel starting a new case', async () => {
+    signInAs(student({ caseNumber: 'C1' }));
+    mocked.getCaseRecord.mockResolvedValue(approvedC1);
+    mocked.getCasesForStudent.mockResolvedValue([approvedC1]);
+    render(<StudentDashboard />);
+
+    fireEvent.click(await screen.findByText('Start your next case →'));
+    fireEvent.click(screen.getByText('Cancel — back to my approved case'));
+
+    expect(await screen.findByText('Start your next case →')).toBeInTheDocument();
+    expect(screen.getByLabelText('Case number')).toHaveValue('C1');
   });
 });

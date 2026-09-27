@@ -2,6 +2,13 @@
 
 How the system has evolved, newest first. Commit hashes are in brackets.
 
+## Several cases per student (2026-09)
+- **Next case:** once a case has final approval, the student can start their next case. `users/{uid}.caseNumber` now points at the current case, and earlier cases stay in `cases/`.
+- **Approved-case counts:** the student sees their count, and staff see it per student, in the roster and in each case row.
+- **Supervisor access:** supervisors can read every case of the students assigned to them, including earlier cases.
+- **Sections key:** a key under **Case reviews** explains the five section dots and the "n/5" count.
+- **Rules:** a student can move to a new case only once the current one is approved, and only to a case they created. There are 64 rules tests.
+
 ## Security hardening (2026-09)
 - **Firestore rules tightened**, with 60 emulator tests in `rules-tests/`:
   - A supervisor can only move a case from *supervisor* to *lecturer* (by approving it), or keep it at *supervisor* (by rejecting it). Previously they could jump a case straight to *approved*.

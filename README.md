@@ -29,9 +29,10 @@ pending ──submit──▶ supervisor ──approve──▶ lecturer ──a
                  (stays here, with a reason; the student fixes the case and resubmits)
 ```
 
+- A student works on one case at a time. Once it's approved they can start the next one. Earlier cases are kept, and staff and the student see how many are approved.
 - Only the Lecturer sets `greenLight`, and only together with `approved`.
 - A rejection records `rejectionReason` and keeps the case at the same stage.
-- Case sections: intro, case report, discussion, conclusion, references.
+- Case sections, in order: 1 Introduction, 2 Case report, 3 Discussion, 4 Conclusion, 5 References. The case table shows them as five dots with an "n/5" count, and a key sits underneath.
 
 ## Security model
 

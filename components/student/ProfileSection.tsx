@@ -7,10 +7,13 @@ import { START_YEAR_MIN, START_YEAR_MAX, CLASS_YEARS } from '@/lib/config';
 import type { StaffDirectoryEntry, UserProfile } from '@/types';
 
 // The student's details: case number (locked after the first save), years,
-// supervisor pick (locked once submitted) and password.
+// supervisor pick (locked once submitted) and password. With newCase, the
+// student is entering the number of their next case after an approval.
 export default function ProfileSection({
   index,
   userProfile,
+  newCase = false,
+  onCancelNewCase,
   caseNumber,
   onCaseNumberChange,
   startYear,
@@ -25,6 +28,8 @@ export default function ProfileSection({
 }: {
   index: number;
   userProfile: UserProfile | null;
+  newCase?: boolean;
+  onCancelNewCase?: () => void;
   caseNumber: string;
   onCaseNumberChange: (value: string) => void;
   startYear: number;
@@ -39,7 +44,7 @@ export default function ProfileSection({
 }) {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
 
-  const isProfileSetup = !!userProfile?.caseNumber;
+  const isProfileSetup = !!userProfile?.caseNumber && !newCase;
   const supervisorName = userProfile?.supervisorDirectoryName ?? userProfile?.assignedSupervisorName;
   const hasSupervisor = !!(userProfile?.supervisorDirectoryId || userProfile?.assignedSupervisorUid);
   const supervisorSignedUp = !!userProfile?.assignedSupervisorUid;
@@ -49,8 +54,12 @@ export default function ProfileSection({
       <SectionHeader
         index={index}
         eyebrow="Profile"
-        title={isProfileSetup ? 'Your details' : 'Set up your profile'}
-        description={isProfileSetup ? undefined : 'Add your case number to start tracking. It’s locked after the first save.'}
+        title={newCase ? 'Start your next case' : isProfileSetup ? 'Your details' : 'Set up your profile'}
+        description={
+          newCase
+            ? 'Enter the number of your next case report. It’s locked after the first save.'
+            : isProfileSetup ? undefined : 'Add your case number to start tracking. It’s locked after the first save.'
+        }
       />
       <div className="card p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div className="sm:col-span-2">
@@ -65,6 +74,11 @@ export default function ProfileSection({
             className="input font-mono"
           />
           {isProfileSetup && <p className="text-xs text-muted mt-1.5">Locked after first save</p>}
+          {newCase && onCancelNewCase && (
+            <button type="button" onClick={onCancelNewCase} className="text-xs text-muted hover:underline mt-1.5">
+              Cancel — back to my approved case
+            </button>
+          )}
         </div>
         <div>
           <label className="field-label" htmlFor="start-year">Start year</label>
@@ -109,6 +123,8 @@ export default function ProfileSection({
               ? staffError
               : savingSupervisor
               ? 'Saving…'
+              : newCase
+              ? `Your new case goes to ${supervisorName ?? 'your supervisor'}. Save it first if you want to change supervisor.`
               : supervisorLocked
               ? 'Locked because your case has been submitted. Ask your Lecturer if it needs to change.'
               : hasSupervisor && !supervisorSignedUp

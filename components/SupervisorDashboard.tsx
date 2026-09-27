@@ -28,6 +28,7 @@ import { effectiveDeadline } from '@/lib/deadlines';
 import { ACCOUNTABILITY_WINDOW_DAYS } from '@/lib/config';
 import { updateMyStudents, type UnassignedStudent } from '@/lib/api-client';
 import {
+  approvedCounts,
   deadlineCounts,
   errorMessage,
   stageOf,
@@ -140,7 +141,18 @@ function Dashboard() {
   };
 
 
-  const casesByStudent = useMemo(() => new Map(cases.map((c) => [c.studentUid, c])), [cases]);
+  // Each student's current case (a student may also have earlier, approved ones).
+  const casesByStudent = useMemo(() => {
+    const byNumber = new Map(cases.map((c) => [c.caseNumber, c]));
+    const map = new Map<string, CaseRecord>();
+    for (const s of students) {
+      const rec = s.caseNumber ? byNumber.get(s.caseNumber) : undefined;
+      if (rec) map.set(s.uid, rec);
+    }
+    return map;
+  }, [cases, students]);
+
+  const approvedByStudent = useMemo(() => approvedCounts(cases), [cases]);
 
   const deadlines = useMemo(() => {
     const map: Record<string, string | undefined> = {};
@@ -329,6 +341,7 @@ function Dashboard() {
                 onApprove={handleApprove}
                 onReject={handleReject}
                 onRevoke={handleRevoke}
+                approvedCounts={approvedByStudent}
               />
             </section>
 
@@ -363,6 +376,7 @@ function Dashboard() {
                 students={students}
                 staff={staff}
                 casesByStudent={casesByStudent}
+                approvedCounts={approvedByStudent}
                 isLecturer={isLecturer}
                 onAssign={handleAssign}
                 onSetDeadline={handleSetDeadline}

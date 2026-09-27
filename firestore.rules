@@ -92,12 +92,24 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(assignmentFields().concat(deadlineFields()))
         && photoOk();
 
-      // The case number is set once and then locked (the student dashboard
-      // says so). Without this a student could clear it to reopen their
-      // supervisor pick after submitting.
+      // A student works on one case at a time; caseNumber points at the
+      // current one. It's locked while that case is in progress (the student
+      // dashboard says so, and it keeps the supervisor pick locked after
+      // submitting). Once the case has final approval the student may start a
+      // new one — but only a case they have already created themselves.
+      function caseApproved(n) {
+        return exists(/databases/$(database)/documents/cases/$(n))
+          && get(/databases/$(database)/documents/cases/$(n)).data.get('greenLight', false) == true;
+      }
+      function ownsCase(n) {
+        return n is string
+          && exists(/databases/$(database)/documents/cases/$(n))
+          && get(/databases/$(database)/documents/cases/$(n)).data.studentUid == request.auth.uid;
+      }
       function caseNumberLocked() {
         return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['caseNumber'])
-          || resource.data.get('caseNumber', '') == '';
+          || ((resource.data.get('caseNumber', '') == '' || caseApproved(resource.data.caseNumber))
+              && ownsCase(request.resource.data.get('caseNumber', null)));
       }
 
       // Users can update their own profile but cannot change their role or
@@ -124,10 +136,14 @@ service cloud.firestore {
 
     // ── Cases ────────────────────────────────────────────────────────────────
     match /cases/{caseNumber} {
-      // Students read their own case (matched via studentUid); staff read all
-      // cases they're staff on — supervisors only the case they're assigned to.
+      // Students read their own cases (matched via studentUid); the Lecturer
+      // reads all; a supervisor reads the cases they're assigned to.
+      // A supervisor also reads the earlier cases of students currently
+      // assigned to them (to see how many they've had approved).
       allow read: if isLecturer()
         || (isSupervisor() && resource.data.supervisorUid == request.auth.uid)
+        || (isSupervisor()
+            && get(/databases/$(database)/documents/users/$(resource.data.studentUid)).data.get('assignedSupervisorUid', null) == request.auth.uid)
         || (isStudent() && resource.data.studentUid == request.auth.uid);
 
       // A student's case may only name the supervisor already assigned to them

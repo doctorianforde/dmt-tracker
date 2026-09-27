@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  approvedCounts,
   deadlineCounts,
   formSnapshot,
   reviewFeedback,
@@ -147,5 +148,16 @@ describe('formSnapshot', () => {
 
   it('changes when a section is ticked', () => {
     expect(formSnapshot({ ...base, sections: { ...DEFAULT_SECTIONS, intro: true } })).not.toBe(formSnapshot(base));
+  });
+});
+
+describe('approvedCounts', () => {
+  it('counts approved cases per student, including legacy green-lit ones', () => {
+    expect(approvedCounts([
+      makeCase({ caseNumber: 'A', approvalStage: 'approved', greenLight: true }),
+      makeCase({ caseNumber: 'B', approvalStage: undefined, greenLight: true }),
+      makeCase({ caseNumber: 'C', approvalStage: 'lecturer' }),
+      makeCase({ caseNumber: 'D', studentUid: 'student-2', approvalStage: 'approved', greenLight: true }),
+    ])).toEqual({ 'student-1': 2, 'student-2': 1 });
   });
 });

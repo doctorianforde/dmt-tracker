@@ -7,11 +7,14 @@ export default function ReviewFeedback({
   busy,
   submitting,
   onResubmit,
+  onStartNewCase,
 }: {
   feedback: Feedback;
   busy: boolean;
   submitting: boolean;
   onResubmit: () => void;
+  // Offered once the case is approved.
+  onStartNewCase?: () => void;
 }) {
   const { stage, rejectionReason, resubmitted } = feedback;
 
@@ -40,12 +43,17 @@ export default function ReviewFeedback({
         </div>
       )}
       {stage === 'approved' && (
-        <div className="card p-5 flex items-center gap-4">
+        <div className="card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
           <span className="w-11 h-11 rounded-full bg-ok/15 text-ok flex items-center justify-center text-xl flex-shrink-0" aria-hidden>✓</span>
           <div>
             <p className="font-bold text-ink">Case approved 🎉</p>
             <p className="text-sm text-muted mt-0.5">Your Lecturer has given your case report final approval.</p>
           </div>
+          {onStartNewCase && (
+            <button onClick={onStartNewCase} className="btn-primary whitespace-nowrap sm:ml-auto">
+              Start your next case →
+            </button>
+          )}
         </div>
       )}
     </>

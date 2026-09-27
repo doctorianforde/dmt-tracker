@@ -170,3 +170,22 @@ describe('SupervisorDashboard: lecturer', () => {
     expect(screen.getByText('Jane Student (C1)')).toBeInTheDocument();
   });
 });
+
+describe('SupervisorDashboard: approved cases and sections key', () => {
+  it('shows each student’s number of approved cases and explains the section dots', async () => {
+    signInAs(LECTURER);
+    mocked.getAllCases.mockResolvedValue([
+      caseRecord({ caseNumber: 'OLD1', approvalStage: 'approved', greenLight: true }),
+      caseRecord({ caseNumber: 'OLD2', approvalStage: 'approved', greenLight: true }),
+      caseRecord({ caseNumber: 'C1' }),
+    ]);
+    render(<SupervisorDashboard />);
+
+    // Once per case row and once in the student roster.
+    expect(await screen.findAllByText('2 approved cases')).toHaveLength(4);
+    const key = screen.getByRole('list', { name: 'Sections key' });
+    expect(within(key).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      '1Introduction', '2Case report', '3Discussion', '4Conclusion', '5References',
+    ]);
+  });
+});

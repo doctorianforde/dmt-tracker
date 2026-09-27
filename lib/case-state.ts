@@ -8,6 +8,15 @@ export type ReviewerRole = 'supervisor' | 'lecturer';
 
 export const SECTION_KEYS: (keyof CaseSections)[] = ['intro', 'caseReport', 'discussion', 'conclusion', 'references'];
 
+// What each of the five progress dots (and "n/5") stands for, in order.
+export const SECTION_LABELS: Record<keyof CaseSections, string> = {
+  intro: 'Introduction',
+  caseReport: 'Case report',
+  discussion: 'Discussion',
+  conclusion: 'Conclusion',
+  references: 'References',
+};
+
 export const DEFAULT_SECTIONS: CaseSections = {
   intro: false,
   caseReport: false,
@@ -22,6 +31,15 @@ export function errorMessage(err: unknown): string {
 
 export function stageOf(record: CaseRecord): ApprovalStage {
   return record.approvalStage ?? (record.greenLight ? 'approved' : 'pending');
+}
+
+// Approved cases per student uid.
+export function approvedCounts(cases: CaseRecord[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const c of cases) {
+    if (stageOf(c) === 'approved') counts[c.studentUid] = (counts[c.studentUid] ?? 0) + 1;
+  }
+  return counts;
 }
 
 function approvalKey(role: ReviewerRole): 'supervisorApproval' | 'lecturerApproval' {

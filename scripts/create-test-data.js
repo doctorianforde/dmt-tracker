@@ -49,6 +49,9 @@ const testStudents = [
     email: 'student1@test.edu', name: 'Test Student Alice', caseNumber: 'TEST-001',
     startYear: 2024, classYear: 4, supervisorEmail: 'supervisor1@test.edu',
     case: { approvalStage: 'pending', sections: { ...ALL_DONE, discussion: false, conclusion: false, references: false } },
+    // An earlier case that already has final approval.
+    pastCases: [{ caseNumber: 'TEST-000', approvalStage: 'approved', greenLight: true, sections: ALL_DONE,
+      supervisorApproval: { approved: true, approvedAt: new Date() }, lecturerApproval: { approved: true, approvedAt: new Date() } }],
   },
   {
     email: 'student2@test.edu', name: 'Test Student Bob', caseNumber: 'TEST-002',
@@ -129,6 +132,19 @@ async function createTestData() {
       ...s.case,
       updatedAt: FieldValue.serverTimestamp(),
     });
+    for (const past of s.pastCases ?? []) {
+      await db.collection('cases').doc(past.caseNumber).set({
+        studentUid: uid,
+        studentName: s.name,
+        startYear: s.startYear,
+        classYear: s.classYear,
+        supervisorUid: sup.uid,
+        supervisorName: sup.name,
+        ...past,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      console.log(`     ${past.caseNumber} (${past.approvalStage}, earlier case)`);
+    }
     console.log(`     ${s.caseNumber} (${s.case.approvalStage}) → ${sup.name}`);
   }
 

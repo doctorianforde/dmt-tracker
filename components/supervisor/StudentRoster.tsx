@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Avatar from '@/components/ui/Avatar';
 import DeadlineCell from '@/components/supervisor/DeadlineCell';
+import { ApprovedCount } from '@/components/CaseTable';
 import { effectiveDeadline } from '@/lib/deadlines';
 import { stageOf } from '@/lib/case-state';
 import type { CaseRecord, StaffDirectoryEntry, UserProfile } from '@/types';
@@ -13,6 +14,7 @@ export default function StudentRoster({
   students,
   staff,
   casesByStudent,
+  approvedCounts,
   isLecturer,
   onAssign,
   onSetDeadline,
@@ -20,7 +22,9 @@ export default function StudentRoster({
 }: {
   students: UserProfile[];
   staff: StaffDirectoryEntry[];
+  // Each student's current case.
   casesByStudent: Map<string, CaseRecord>;
+  approvedCounts: Record<string, number>;
   isLecturer: boolean;
   onAssign: (student: UserProfile, directoryId: string) => Promise<boolean>;
   onSetDeadline: (student: UserProfile, deadline: string | null) => Promise<boolean>;
@@ -49,7 +53,8 @@ export default function StudentRoster({
           <thead>
             <tr className="border-b border-line bg-surface2/50">
               <th className={`${th} pl-5`}>Student</th>
-              <th className={th}>Case #</th>
+              <th className={th}>Current case</th>
+              <th className={th}>Approved cases</th>
               {isLecturer && <th className={th}>Supervisor</th>}
               <th className={th}>Deadline</th>
               <th className={th}>Extension request</th>
@@ -72,6 +77,9 @@ export default function StudentRoster({
                     </div>
                   </td>
                   <td className="px-4 py-4 text-xs text-muted font-mono whitespace-nowrap">{student.caseNumber ?? '—'}</td>
+                  <td className="px-4 py-4">
+                    <ApprovedCount count={approvedCounts[student.uid] ?? 0} />
+                  </td>
                   {isLecturer && (
                     <td className="px-4 py-4">
                       <select

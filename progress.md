@@ -11,6 +11,14 @@ _Last updated: 2026-09-27_
 - **Build and checks:** `tsc`, `eslint` and `next build` are clean.
 - **Committed and deployed:** committed and pushed as `f9d83e6`; rules deployed to production on 2026-09-27.
 
+## Several cases per student and sections key (2026-09-27, deployed)
+- [x] **Next case:** students start their next case once the current one is approved. Earlier cases are shown under **Your cases**.
+- [x] **Approved-case counts:** shown to the student on their status card, and to staff in the roster and on each case row.
+- [x] **Supervisor access:** supervisors can read every case of their assigned students, so their counts are complete.
+- [x] **Sections key:** added under **Case reviews**: 1 Introduction, 2 Case report, 3 Discussion, 4 Conclusion, 5 References, plus what "n/5" means.
+- [x] **Rules and tests:** 64 rules tests and 87 unit/component tests.
+- [x] Rules deployed and code pushed together.
+
 ## Done: 2026-09-27
 
 ### Phase 1: Security and hygiene

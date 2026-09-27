@@ -44,6 +44,9 @@ const USERS = {
   // Case C4 is waiting on the Lecturer.
   student4: { name: 'Student Four', email: 's4@test.edu', role: 'student', caseNumber: 'C4',
     assignedSupervisorUid: 'sup1', assignedSupervisorName: 'Dr Sup One' },
+  // Case C5 has final approval, so they may start another.
+  student5: { name: 'Student Five', email: 's5@test.edu', role: 'student', caseNumber: 'C5',
+    assignedSupervisorUid: 'sup1', assignedSupervisorName: 'Dr Sup One' },
   sup1: { name: 'Dr Sup One', email: 'sup1@test.edu', role: 'supervisor' },
   sup2: { name: 'Dr Sup Two', email: 'sup2@test.edu', role: 'supervisor' },
   lect: { name: 'Dr Lecturer', email: 'lect@test.edu', role: 'lecturer' },
@@ -57,6 +60,9 @@ const CASES = {
   C4: { studentUid: 'student4', studentName: 'Student Four', caseNumber: 'C4', startYear: 2025, classYear: 1,
     sections: SECTIONS, greenLight: false, approvalStage: 'lecturer', supervisorUid: 'sup1', supervisorName: 'Dr Sup One',
     supervisorApproval: { approved: true } },
+  C5: { studentUid: 'student5', studentName: 'Student Five', caseNumber: 'C5', startYear: 2025, classYear: 1,
+    sections: SECTIONS, greenLight: true, approvalStage: 'approved', supervisorUid: 'sup1', supervisorName: 'Dr Sup One',
+    supervisorApproval: { approved: true }, lecturerApproval: { approved: true } },
 };
 
 const STAFF = {
@@ -157,10 +163,29 @@ describe('users: a student editing their own profile', () => {
     await assertFails(updateDoc(doc(as('student1'), 'users/student1'), { deadline: '2030-01-01' }));
   });
 
-  it('sets their case number once, then it is locked', async () => {
+  it('sets their case number to a case they created, then it is locked', async () => {
+    await assertFails(updateDoc(doc(as('student2'), 'users/student2'), { caseNumber: 'C2' }));
+    await setDoc(doc(as('student2'), 'cases/C2'), { studentUid: 'student2', studentName: 'Student Two', caseNumber: 'C2',
+      startYear: 2025, classYear: 1, sections: SECTIONS, greenLight: false, approvalStage: 'pending' });
     await assertSucceeds(updateDoc(doc(as('student2'), 'users/student2'), { caseNumber: 'C2' }));
     await assertFails(updateDoc(doc(as('student1'), 'users/student1'), { caseNumber: 'C9' }));
     await assertFails(updateDoc(doc(as('student1'), 'users/student1'), { caseNumber: '' }));
+  });
+
+  it('moves on to a new case of their own once the current one is approved', async () => {
+    await assertFails(updateDoc(doc(as('student5'), 'users/student5'), { caseNumber: 'C6' }));
+    await assertFails(updateDoc(doc(as('student5'), 'users/student5'), { caseNumber: 'C1' }));
+    await setDoc(doc(as('student5'), 'cases/C6'), { studentUid: 'student5', studentName: 'Student Five', caseNumber: 'C6',
+      startYear: 2025, classYear: 2, sections: SECTIONS, greenLight: false, approvalStage: 'pending',
+      supervisorUid: 'sup1', supervisorName: 'Dr Sup One' });
+    await assertSucceeds(updateDoc(doc(as('student5'), 'users/student5'), { caseNumber: 'C6' }));
+  });
+
+  it('cannot start a new case while the current one is in review', async () => {
+    await setDoc(doc(as('student1'), 'cases/C7'), { studentUid: 'student1', studentName: 'Student One', caseNumber: 'C7',
+      startYear: 2025, classYear: 1, sections: SECTIONS, greenLight: false, approvalStage: 'pending',
+      supervisorUid: 'sup1', supervisorName: 'Dr Sup One' });
+    await assertFails(updateDoc(doc(as('student1'), 'users/student1'), { caseNumber: 'C7' }));
   });
 
   it('rejects an oversized profile photo', async () => {
@@ -238,11 +263,26 @@ describe('cases: reading', () => {
     await assertFails(getDoc(doc(as('student3'), 'cases/C1')));
   });
 
+  it('a student lists all of their own cases, and nobody else’s', async () => {
+    await assertSucceeds(getDocs(query(collection(as('student5'), 'cases'), where('studentUid', '==', 'student5'))));
+    await assertFails(getDocs(query(collection(as('student5'), 'cases'), where('studentUid', '==', 'student1'))));
+    await assertFails(getDocs(collection(as('student5'), 'cases')));
+  });
+
   it('a supervisor reads only cases assigned to them', async () => {
     await assertSucceeds(getDoc(doc(as('sup1'), 'cases/C1')));
     await assertFails(getDoc(doc(as('sup2'), 'cases/C1')));
     await assertSucceeds(getDocs(query(collection(as('sup1'), 'cases'), where('supervisorUid', '==', 'sup1'))));
     await assertFails(getDocs(collection(as('sup1'), 'cases')));
+  });
+
+  it('a supervisor reads every case of a student assigned to them, even ones someone else supervised', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'cases/OLD1'),
+      { ...CASES.C5, studentUid: 'student1', caseNumber: 'OLD1', supervisorUid: 'sup2', supervisorName: 'Dr Sup Two' }));
+    await assertSucceeds(getDoc(doc(as('sup1'), 'cases/OLD1')));
+    await assertSucceeds(getDocs(query(collection(as('sup1'), 'cases'), where('studentUid', '==', 'student1'))));
+    // …but not the cases of a student assigned to someone else.
+    await assertFails(getDocs(query(collection(as('sup2'), 'cases'), where('studentUid', '==', 'student1'))));
   });
 
   it('the lecturer reads every case', async () => {

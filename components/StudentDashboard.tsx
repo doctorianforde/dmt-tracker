@@ -18,6 +18,7 @@ import AccountabilityCard from '@/components/student/AccountabilityCard';
 import ApprovalPipeline, { STAGE_INFO } from '@/components/student/ApprovalPipeline';
 import {
   getCaseRecord,
+  getCasesForStudent,
   saveCaseRecord,
   submitCaseForReview,
   resubmitCase,
@@ -27,7 +28,8 @@ import {
 } from '@/lib/firestore';
 import type { CaseRecord, CaseSections, UserRole, StaffDirectoryEntry } from '@/types';
 import { daysUntil, effectiveDeadline } from '@/lib/deadlines';
-import { DEFAULT_SECTIONS, SECTION_KEYS, errorMessage, formSnapshot, reviewFeedback } from '@/lib/case-state';
+import { DEFAULT_SECTIONS, SECTION_KEYS, errorMessage, formSnapshot, reviewFeedback, stageOf } from '@/lib/case-state';
+import CaseHistory from '@/components/student/CaseHistory';
 
 // Defined once at module scope — see the same note in SupervisorDashboard.tsx.
 const STUDENT_ROLES: UserRole[] = ['student'];
@@ -61,11 +63,18 @@ function Dashboard() {
   const [staffError, setStaffError] = useState<string | null>(null);
   const [savingSupervisor, setSavingSupervisor] = useState(false);
 
+  // Every case the student has written, including earlier approved ones.
+  const [allCases, setAllCases] = useState<CaseRecord[]>([]);
+  // Filling in the number for a new case, after the current one was approved.
+  const [startingNew, setStartingNew] = useState(false);
+  // Bumped to reload the current case (e.g. when a new case is abandoned).
+  const [reloadKey, setReloadKey] = useState(0);
+
   const uid = user?.uid;
   const profileCaseNumber = userProfile?.caseNumber;
   const profileStartYear = userProfile?.startYear;
   const profileClassYear = userProfile?.classYear;
-  const isProfileSetup = !!profileCaseNumber;
+  const isProfileSetup = !!profileCaseNumber && !startingNew;
 
   useEffect(() => {
     getStaffDirectory()
@@ -89,6 +98,7 @@ function Dashboard() {
             setSections({ ...DEFAULT_SECTIONS, ...rec.sections });
             setExtensionReason(rec.extensionReason ?? '');
           }
+          setAllCases(await getCasesForStudent(uid));
         }
       } catch (err: unknown) {
         setLoadError('Failed to load your case: ' + errorMessage(err));
@@ -97,7 +107,7 @@ function Dashboard() {
       }
     }
     load();
-  }, [uid, profileCaseNumber, profileStartYear, profileClassYear]);
+  }, [uid, profileCaseNumber, profileStartYear, profileClassYear, reloadKey]);
 
   const showMessage = (text: string, ok: boolean) => {
     setSaveMessage({ text, ok });
@@ -107,7 +117,7 @@ function Dashboard() {
   const dirty =
     formSnapshot({ caseNumber, startYear, classYear, sections, extensionReason }) !==
     formSnapshot({
-      caseNumber: profileCaseNumber ?? '',
+      caseNumber: startingNew ? '' : profileCaseNumber ?? '',
       startYear: profileStartYear ?? new Date().getFullYear(),
       classYear: profileClassYear ?? 1,
       sections: caseRecord?.sections ?? DEFAULT_SECTIONS,
@@ -117,6 +127,11 @@ function Dashboard() {
   // Saves the form. Returns false (after showing the error) on failure.
   const persist = async (): Promise<boolean> => {
     if (!user || !userProfile || !caseNumber.trim()) return false;
+    const creating = !caseRecord;
+    if (creating && allCases.some((c) => c.caseNumber === caseNumber.trim())) {
+      showMessage(`You’ve already used case number ${caseNumber.trim()}. Enter a new one.`, false);
+      return false;
+    }
     setSaving(true);
     try {
       const payload: Partial<CaseRecord> = {
@@ -143,13 +158,31 @@ function Dashboard() {
       const updated = await getCaseRecord(caseNumber.trim());
       setCaseRecord(updated);
       await refreshProfile();
+      if (creating) setAllCases(await getCasesForStudent(user.uid));
+      setStartingNew(false);
       return true;
     } catch (err: unknown) {
-      showMessage('Couldn’t save: ' + errorMessage(err), false);
+      // A new case number that already belongs to another student can't be
+      // written (firestore.rules), which surfaces as a permission error.
+      const taken = creating && (err as { code?: string })?.code === 'permission-denied';
+      showMessage(taken ? 'That case number is already in use. Check it and try again.' : 'Couldn’t save: ' + errorMessage(err), false);
       return false;
     } finally {
       setSaving(false);
     }
+  };
+
+  const startNewCase = () => {
+    setStartingNew(true);
+    setCaseRecord(null);
+    setCaseNumber('');
+    setSections(DEFAULT_SECTIONS);
+    setExtensionReason('');
+  };
+
+  const cancelNewCase = () => {
+    setStartingNew(false);
+    setReloadKey((k) => k + 1);
   };
 
   const handleSave = async () => {
@@ -241,6 +274,9 @@ function Dashboard() {
   const supervisorSignedUp = !!userProfile?.assignedSupervisorUid;
   const busy = submitting || saving;
 
+  const approvedCount = allCases.filter((c) => stageOf(c) === 'approved').length;
+  const earlierCases = allCases.filter((c) => c.caseNumber !== (startingNew ? undefined : profileCaseNumber));
+
   const deadline = effectiveDeadline(userProfile, caseRecord);
   const daysLeft = deadline ? daysUntil(deadline) : Infinity;
 
@@ -248,6 +284,8 @@ function Dashboard() {
     <ProfileSection
       index={index}
       userProfile={userProfile}
+      newCase={startingNew}
+      onCancelNewCase={cancelNewCase}
       caseNumber={caseNumber}
       onCaseNumberChange={setCaseNumber}
       startYear={startYear}
@@ -257,7 +295,7 @@ function Dashboard() {
       staff={staff}
       staffError={staffError}
       savingSupervisor={savingSupervisor}
-      supervisorLocked={approvalStage !== 'pending'}
+      supervisorLocked={startingNew || approvalStage !== 'pending'}
       onSupervisorChange={handleSupervisorChange}
     />
   );
@@ -274,7 +312,9 @@ function Dashboard() {
           <AvatarUpload size={112} />
           <div className="min-w-0">
             <p className="eyebrow text-on-canvas-muted">
-              {isProfileSetup
+              {startingNew
+                ? 'Starting your next case'
+                : isProfileSetup
                 ? `Case ${userProfile?.caseNumber} · Year ${userProfile?.classYear} · Started ${userProfile?.startYear}`
                 : 'Welcome to VIS'}
             </p>
@@ -291,11 +331,20 @@ function Dashboard() {
               <p className="eyebrow text-muted">Status</p>
               <p className="display text-xl text-ink mt-1 max-w-[10rem] leading-tight">{stageInfo.label}</p>
               {approvalStage === 'approved' && <p className="text-2xl mt-1" aria-hidden>{themeMarkers.approved}</p>}
+              <p className="text-xs font-semibold text-muted mt-2" data-testid="approved-count">
+                {approvedCount} approved case{approvedCount === 1 ? '' : 's'}
+              </p>
             </div>
           </div>
         </header>
 
-        <ReviewFeedback feedback={feedback} busy={busy} submitting={submitting} onResubmit={handleResubmit} />
+        <ReviewFeedback
+          feedback={feedback}
+          busy={busy}
+          submitting={submitting}
+          onResubmit={handleResubmit}
+          onStartNewCase={startingNew ? undefined : startNewCase}
+        />
 
         {!isProfileSetup && profileSection(++n)}
 
@@ -354,6 +403,13 @@ function Dashboard() {
         </section>
 
         {isProfileSetup && profileSection(++n)}
+
+        {earlierCases.length > 0 && (
+          <section>
+            <SectionHeader index={++n} eyebrow="History" title="Your cases" description={`${approvedCount} approved so far.`} />
+            <CaseHistory cases={earlierCases} />
+          </section>
+        )}
       </main>
 
       <SiteFooter />
@@ -368,6 +424,8 @@ function Dashboard() {
               ? '● Unsaved changes'
               : isProfileSetup
               ? 'All changes saved'
+              : startingNew
+              ? 'Enter the number of your next case'
               : 'Enter your case number to get started'}
           </p>
           <button onClick={handleSave} disabled={saving || !caseNumber.trim() || !dirty} className="btn-primary">

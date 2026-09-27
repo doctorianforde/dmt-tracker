@@ -268,12 +268,27 @@ export async function getAllCases(): Promise<CaseRecord[]> {
     .sort((a, b) => a.studentName.localeCompare(b.studentName));
 }
 
+// Every case a student has written — their current one and any earlier,
+// approved ones. The where-clause mirrors the read rule in firestore.rules.
+export async function getCasesForStudent(uid: string): Promise<CaseRecord[]> {
+  const db = getSafeDb();
+  const snap = await getDocs(query(collection(db, 'cases'), where('studentUid', '==', uid)));
+  return snap.docs.map((d) => normalizeCaseRecord(d.data()));
+}
+
+// Supervisor view: the cases they're the reviewer on, plus every case
+// (including earlier, approved ones) of the students assigned to them.
 export async function getCasesForSupervisor(uid: string): Promise<CaseRecord[]> {
   const db = getSafeDb();
-  const snap = await getDocs(query(collection(db, 'cases'), where('supervisorUid', '==', uid)));
-  return snap.docs
-    .map((d) => normalizeCaseRecord(d.data()))
-    .sort((a, b) => a.studentName.localeCompare(b.studentName));
+  const [reviewing, students] = await Promise.all([
+    getDocs(query(collection(db, 'cases'), where('supervisorUid', '==', uid))),
+    getStudentsForSupervisor(uid),
+  ]);
+  const studentCases = await Promise.all(students.map((s) => getCasesForStudent(s.uid)));
+  const byNumber = new Map<string, CaseRecord>();
+  for (const c of reviewing.docs.map((d) => normalizeCaseRecord(d.data()))) byNumber.set(c.caseNumber, c);
+  for (const c of studentCases.flat()) byNumber.set(c.caseNumber, c);
+  return [...byNumber.values()].sort((a, b) => a.studentName.localeCompare(b.studentName));
 }
 
 // ── Access Log ───────────────────────────────────────────────────────────

@@ -36,7 +36,7 @@ resets these accounts' profiles and cases.
 | `supervisor1@test.edu` | Supervisor | Dr. Test Supervisor A: Alice, Bob |
 | `supervisor2@test.edu` | Supervisor | Dr. Test Supervisor B: Carol, Dave |
 | `lecturer@test.edu` | Lecturer | Dr. Test Lecturer |
-| `student1@test.edu` | Student | `TEST-001`, draft (`pending`) |
+| `student1@test.edu` | Student | `TEST-001`, draft (`pending`); earlier case `TEST-000` approved |
 | `student2@test.edu` | Student | `TEST-002`, waiting on supervisor |
 | `student3@test.edu` | Student | `TEST-003`, waiting on lecturer |
 | `student4@test.edu` | Student | `TEST-004`, waiting on lecturer |
@@ -71,12 +71,19 @@ the app over.**
 3. Under **Students & supervisors**, move Dave to Dr. Test Supervisor A. `supervisor1` should now see Dave's case.
 4. **Access log** shows the sign-ins, approvals, rejections and assignments from the steps above.
 
-### 5. Staff sign-up (`/supervisor-signup`)
+### 5. Several cases per student
+1. As `student1`, the status card shows **1 approved case**, and **Your cases** lists `TEST-000`.
+2. As `lecturer`, the **Students & supervisors** table shows **Approved cases** for every student, and each row of **Case reviews** shows the student's count.
+3. Below **Case reviews** there is a **Key: Sections** explaining the five dots: 1 Introduction, 2 Case report, 3 Discussion, 4 Conclusion, 5 References. "3/5" means three of the five are complete.
+4. Take a case all the way to **Grant Final Approval**, then sign in as that student. Click **Start your next case →**, enter a new case number and save. Their count goes up by one, and the approved case moves to **Your cases**.
+5. Starting a new case with a number the student has already used is refused. So is a number that belongs to another student.
+
+### 6. Staff sign-up (`/supervisor-signup`)
 1. Choose Supervisor, pick a name from the directory, and enter the supervisor invite code. The account is created, and the name disappears from the list for later sign-ups.
 2. Choose Lecturer but enter the supervisor code. You should see an error explaining that it's the wrong code.
 3. Enter a wrong code. You should see "Incorrect invite code".
 
-### 6. Accounts
+### 7. Accounts
 - **Sign-up:** a new student sign-up shows the verify-email screen until the link is clicked.
 - **Forgot password:** the "Forgot password?" link on `/` sends a reset email.
 - **Change password:** works from the dashboard.

@@ -9,7 +9,7 @@ _Last updated: 2026-09-27_
 - **Unit and component tests:** 80 passing, in 10 files (`npm test`).
 - **Firestore rules tests:** 60 passing on the emulator (`npm run test:rules`, needs Java 21).
 - **Build and checks:** `tsc`, `eslint` and `next build` are clean.
-- **Not yet done:** the changes below are **not committed**, and the rules are **not yet deployed** (`npm run deploy:rules`).
+- **Committed and deployed:** committed and pushed as `f9d83e6`; rules deployed to production on 2026-09-27.
 
 ## Done: 2026-09-27
 
@@ -63,13 +63,9 @@ _Last updated: 2026-09-27_
 
 ## To do
 
-- [ ] Commit and push these changes.
-- [ ] Deploy the tightened rules: `npm run test:rules && npm run deploy:rules`.
-- [ ] Parent-folder leftovers still waiting on you. All are unused by the app:
-  - `venv/` (1.2 GB): delete.
-  - root `node_modules/`: orphaned, since there's no `package.json` there. Delete.
-  - `medical_vault.json`: empty. Delete.
-  - `firebase_key.json` and `dmt-tracker-a80f2-firebase-adminsdk-*.json`: two copies of an **old** service-account key. The app uses a different key in `.env.local`. Revoke this key in Google Cloud Console → IAM → Service Accounts → Keys, then delete both files.
+- [x] Committed and pushed (`f9d83e6`); rules deployed.
+- [x] Parent-folder leftovers deleted: `venv/`, root `node_modules/`, `medical_vault.json`, old key files.
+- [ ] Revoke the old service-account key in Google Cloud Console (IAM → Service Accounts → Keys). The local copies are deleted, but the key is still valid until it's revoked.
 - [ ] Rotate the test passwords, or delete the test accounts before delivery.
 - [ ] Phase 3: GitHub Actions CI (lint, types, tests, rules tests, build).
 - [ ] Phase 5 backlog: see [plan.md](plan.md).

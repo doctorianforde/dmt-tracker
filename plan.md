@@ -34,8 +34,7 @@ Phases 1–4 are largely done. See [progress.md](progress.md) for what changed.
 Still open:
 
 - **CI.** Add a GitHub Actions workflow that runs `npm ci`, `lint`, `tsc --noEmit`, `test`, `test:rules` (with Java 21) and `build` on every push and PR.
-- **Rules deploy.** Run `npm run test:rules && npm run deploy:rules`.
-- **Parent folder.** Delete `venv/`, the root `node_modules/` and `medical_vault.json`. Revoke the old service-account key, then delete its two JSON copies.
+- **Old key.** Revoke the old service-account key in Google Cloud Console. Its local files are already deleted.
 - **Test accounts.** Delete all of them before delivery.
 
 ## Phase 5 — Feature backlog (to prioritise with users)

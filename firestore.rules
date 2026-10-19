@@ -242,6 +242,19 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── Bug reports ──────────────────────────────────────────────────────────
+    // Written only by the server (/api/bug-report, Admin SDK), which numbers
+    // each report, rate-limits it and emails it. Never read by clients.
+    match /bugReports/{issueNumber} {
+      allow read, write: if false;
+    }
+    match /bugReportLimits/{uid} {
+      allow read, write: if false;
+    }
+    match /counters/{counterId} {
+      allow read, write: if false;
+    }
+
     // ── Access Log ───────────────────────────────────────────────────────────
     match /accessLogs/{logId} {
       // Only the Lecturer can read the audit trail.

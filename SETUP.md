@@ -152,7 +152,29 @@ npm run seed:test     # Create test accounts (see TEST_GUIDE.md)
    project settings. Paste `FIREBASE_ADMIN_PRIVATE_KEY` exactly as it appears
    in the downloaded JSON (Vercel's env var editor handles the embedded
    newlines fine).
-4. Deploy — Vercel detects Next.js automatically
+4. For bug reports, add `GMAIL_USER` and `GMAIL_APP_PASSWORD` (see below).
+5. Deploy — Vercel detects Next.js automatically
+
+### Bug reports
+
+Every signed-in user can click **Report a bug** in the top bar. The report is
+given the next issue number (`VIS-0001`, `VIS-0002`, …), saved in the
+`bugReports` collection, and emailed to `vistracker2026@gmail.com` (override with
+`BUG_REPORT_TO`), with Reply-To set to the reporter. The reporter gets a
+confirmation email with their issue number. Each user can send up to 5
+reports an hour.
+
+Emails go through a Gmail account:
+
+1. Use the VIS Gmail account (vistracker2026@gmail.com). It sends the emails
+   and receives the reports. Turn on 2-Step Verification
+   (Google Account → Security).
+2. Create an app password: Google Account → Security → 2-Step Verification →
+   **App passwords**. Copy the 16-character password.
+3. Set `GMAIL_USER` (the Gmail address) and `GMAIL_APP_PASSWORD` in
+   `.env.local` and in Vercel, then redeploy.
+
+Without these, the form says bug reporting isn't set up yet.
 
 ## User Flows
 

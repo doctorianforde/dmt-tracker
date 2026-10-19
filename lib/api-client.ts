@@ -25,6 +25,18 @@ export async function getUnassignedStudents(): Promise<UnassignedStudent[]> {
   return (await authedFetch<{ students: UnassignedStudent[] }>('/api/supervisor/students')).students;
 }
 
+export interface BugReportResult {
+  issueNumber: string;
+  confirmationSent: boolean;
+}
+
+export async function submitBugReport(report: { summary: string; description: string; steps: string }): Promise<BugReportResult> {
+  return authedFetch<BugReportResult>('/api/bug-report', {
+    method: 'POST',
+    body: JSON.stringify({ ...report, page: window.location.pathname, userAgent: navigator.userAgent }),
+  });
+}
+
 export async function updateMyStudents(studentUid: string, action: 'add' | 'remove'): Promise<void> {
   await authedFetch('/api/supervisor/students', {
     method: 'POST',

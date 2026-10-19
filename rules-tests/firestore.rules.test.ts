@@ -495,3 +495,15 @@ describe('access log', () => {
     await assertFails(getDocs(collection(as('student1'), 'accessLogs')));
   });
 });
+
+describe('bug reports', () => {
+  it('only the server reads or writes reports, counters and rate limits', async () => {
+    for (const user of ['student1', 'lect']) {
+      await assertFails(getDoc(doc(as(user), 'bugReports/VIS-0001')));
+      await assertFails(setDoc(doc(as(user), 'bugReports/VIS-0001'), { summary: 'x' }));
+      await assertFails(getDoc(doc(as(user), 'counters/bugReports')));
+      await assertFails(setDoc(doc(as(user), 'counters/bugReports'), { last: 0 }));
+      await assertFails(setDoc(doc(as(user), `bugReportLimits/${user}`), { sentAt: [] }));
+    }
+  });
+});

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import ThemePicker from '@/components/ThemePicker';
 import Avatar from '@/components/ui/Avatar';
 import ChangePasswordForm from '@/components/ChangePasswordForm';
+import BugReportForm from '@/components/BugReportForm';
 
 const ROLE_LABELS: Record<string, string> = {
   student: 'Student',
@@ -31,18 +32,18 @@ export default function Navbar() {
   const { userProfile, signOut } = useAuth();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [dialog, setDialog] = useState<'password' | 'bug' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!menuOpen && !passwordOpen) return;
+    if (!menuOpen && !dialog) return;
     const onDown = (e: MouseEvent) => {
       if (menuOpen && menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setMenuOpen(false);
-        setPasswordOpen(false);
+        setDialog(null);
       }
     };
     document.addEventListener('mousedown', onDown);
@@ -51,7 +52,7 @@ export default function Navbar() {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [menuOpen, passwordOpen]);
+  }, [menuOpen, dialog]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -64,6 +65,17 @@ export default function Navbar() {
         <BrandMark className="text-ink" />
 
         <div className="flex items-center gap-1 sm:gap-2">
+          {userProfile && (
+            <button
+              onClick={() => setDialog('bug')}
+              aria-label="Report a bug"
+              title="Report a bug"
+              className="btn-ghost !px-2.5 sm:!px-3 !py-2 whitespace-nowrap"
+            >
+              <span aria-hidden>🐞</span>
+              <span className="hidden md:inline ml-1.5">Report a bug</span>
+            </button>
+          )}
           <ThemePicker />
           {userProfile && (
             <div className="relative pl-2 sm:pl-3 ml-1 border-l border-line" ref={menuRef}>
@@ -86,11 +98,21 @@ export default function Navbar() {
                     role="menuitem"
                     onClick={() => {
                       setMenuOpen(false);
-                      setPasswordOpen(true);
+                      setDialog('password');
                     }}
                     className="w-full text-left rounded-lg px-3 py-2 text-sm text-ink hover:bg-ink/5"
                   >
                     Change password
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setDialog('bug');
+                    }}
+                    className="w-full text-left rounded-lg px-3 py-2 text-sm text-ink hover:bg-ink/5"
+                  >
+                    Report a bug
                   </button>
                   <button role="menuitem" onClick={handleSignOut} className="w-full text-left rounded-lg px-3 py-2 text-sm text-ink hover:bg-ink/5">
                     Sign out
@@ -105,14 +127,24 @@ export default function Navbar() {
         </div>
       </div>
 
-      {passwordOpen && (
+      {dialog && (
         <div
           className="fixed inset-0 z-40 bg-black/40 flex items-start sm:items-center justify-center p-4 overflow-y-auto"
-          onMouseDown={(e) => e.target === e.currentTarget && setPasswordOpen(false)}
+          onMouseDown={(e) => e.target === e.currentTarget && setDialog(null)}
         >
-          <div role="dialog" aria-modal="true" aria-labelledby="change-password-title" className="card w-full max-w-lg p-6 sm:p-8 mt-16 sm:mt-0">
-            <h2 id="change-password-title" className="display text-3xl text-ink mb-5">Change password</h2>
-            <ChangePasswordForm onDone={() => setPasswordOpen(false)} />
+          <div role="dialog" aria-modal="true" aria-labelledby="navbar-dialog-title" className="card w-full max-w-lg p-6 sm:p-8 mt-16 sm:mt-0">
+            {dialog === 'password' ? (
+              <>
+                <h2 id="navbar-dialog-title" className="display text-3xl text-ink mb-5">Change password</h2>
+                <ChangePasswordForm onDone={() => setDialog(null)} />
+              </>
+            ) : (
+              <>
+                <h2 id="navbar-dialog-title" className="display text-3xl text-ink mb-1">Report a bug</h2>
+                <p className="text-sm text-muted mb-5">Tell us what went wrong and we’ll pass it to the developers.</p>
+                <BugReportForm email={userProfile?.email ?? 'your email'} onDone={() => setDialog(null)} />
+              </>
+            )}
           </div>
         </div>
       )}

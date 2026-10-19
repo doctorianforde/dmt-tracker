@@ -6,10 +6,9 @@ _Last updated: 2026-10-19_
 
 ## Pick up here (next session)
 
-1. **Test bug reports on the live site.** Sign in at https://vis-tracker.vercel.app, click 🐞 **Report a bug**, send a test. Expect the report in vistracker2026@gmail.com and a confirmation at your own email, both showing **VIS-0001**. Not yet done.
-2. **Fix Vercel auto-deploy.** Pushes to `main` on 2026-10-19 (`c8b1353`, `4775dc6`) did **not** trigger a Vercel deploy; production was deployed by hand. Check Vercel → Project → Settings → Git: the repo `doctorianforde/dmt-tracker` should be connected and `main` should be the production branch. Reconnect GitHub if needed. Until then, check each push actually deployed (Vercel → Deployments, the commit SHA must match).
-3. **Watch out:** "Redeploy" in Vercel rebuilds the *same* commit as the deployment you click on, not the latest one.
-4. Then the open items under **To do** at the bottom.
+1. **Fix Vercel auto-deploy.** Pushes to `main` on 2026-10-19 (`c8b1353`, `4775dc6`) did **not** trigger a Vercel deploy; production was deployed by hand. Check Vercel → Project → Settings → Git: the repo `doctorianforde/dmt-tracker` should be connected and `main` should be the production branch. Reconnect GitHub if needed. Until then, check each push actually deployed (Vercel → Deployments, the commit SHA must match).
+2. **Watch out:** "Redeploy" in Vercel rebuilds the *same* commit as the deployment you click on, not the latest one.
+3. Then the open items under **To do** at the bottom.
 
 ## Current status
 
@@ -36,6 +35,7 @@ _Last updated: 2026-10-19_
 - [x] Rules: clients can't read or write `bugReports`, `counters` or `bugReportLimits`; only the server (Admin SDK) does.
 - [x] Privacy Policy and Terms pages now list **vistracker2026@gmail.com** as the contact (was VISTrackerTT@proton.me). That's now the one VIS email.
 - [x] Setup steps in [SETUP.md](SETUP.md) → **Bug reports**.
+- [x] **Tested live on 2026-10-19:** the report reached vistracker2026@gmail.com and the confirmation reached the reporter. The test used issue number `VIS-0001`, so real reports start at `VIS-0002`.
 
 ## Lecturer approval fix (2026-10-19, deployed)
 - [x] **Problem:** the Lecturer reported no way to approve cases. Final approval needed a Supervisor's approval first, and there are no Supervisor accounts.
@@ -103,7 +103,6 @@ _Last updated: 2026-10-19_
 
 ## To do
 
-- [ ] **Test a bug report on the live site** (see **Pick up here**).
 - [ ] **Fix Vercel auto-deploy from GitHub** (see **Pick up here**).
 - [ ] Revoke the old service-account key in Google Cloud Console (IAM → Service Accounts → Keys). The local copies are deleted, but the key is still valid until it's revoked.
 - [ ] Rotate the test passwords, or delete the test accounts before delivery. This includes the "Test Supervisor" Lecturer account on production.

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { BrandMark } from '@/components/Navbar';
 
-export const LEGAL_CONTACT_EMAIL = 'VISTrackerTT@proton.me';
+export const LEGAL_CONTACT_EMAIL = 'vistracker2026@gmail.com';
 export const LEGAL_EFFECTIVE_DATE = '24 September 2026';
 
 // Shared shell for the public Privacy Policy and Terms of Service pages.

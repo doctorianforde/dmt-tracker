@@ -92,7 +92,7 @@ describe('SupervisorDashboard: supervisor', () => {
 
     fireEvent.click(await screen.findByText('✅ Approve & Send to Lecturer'));
 
-    await waitFor(() => expect(mocked.approveCase).toHaveBeenCalledWith('C1', 'supervisor', 'lecturer'));
+    await waitFor(() => expect(mocked.approveCase).toHaveBeenCalledWith('C1', 'supervisor', 'lecturer', false));
     expect(mocked.logAccess).toHaveBeenCalledWith(expect.objectContaining({ action: 'approve', targetId: 'C1' }));
     await waitFor(() => expect(screen.queryByText('✅ Approve & Send to Lecturer')).not.toBeInTheDocument());
   });
@@ -130,7 +130,17 @@ describe('SupervisorDashboard: lecturer', () => {
 
     fireEvent.click(await screen.findByText('✅ Grant Final Approval'));
 
-    await waitFor(() => expect(mocked.approveCase).toHaveBeenCalledWith('C1', 'lecturer', 'approved'));
+    await waitFor(() => expect(mocked.approveCase).toHaveBeenCalledWith('C1', 'lecturer', 'approved', false));
+  });
+
+  it('grants final approval to a case its supervisor has not reviewed, signing off that stage too', async () => {
+    mocked.getAllCases.mockResolvedValue([caseRecord({ approvalStage: 'supervisor', supervisorUid: 'someone-else' })]);
+    render(<SupervisorDashboard />);
+
+    fireEvent.click(await screen.findByText('✅ Grant Final Approval'));
+
+    await waitFor(() => expect(mocked.approveCase).toHaveBeenCalledWith('C1', 'lecturer', 'approved', true));
+    expect(await screen.findByText('Revoke')).toBeInTheDocument();
   });
 
   it('can approve again after revoking an approval', async () => {

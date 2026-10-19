@@ -55,6 +55,13 @@ describe('staff case updates', () => {
     expect(c.lecturerApproval?.approved).toBe(true);
   });
 
+  it('final approval from the supervisor stage records the supervisor approval too', () => {
+    const [c] = withApproval([makeCase({ approvalStage: 'supervisor' })], 'C1', 'lecturer', 'approved');
+    expect(c.approvalStage).toBe('approved');
+    expect(c.supervisorApproval?.approved).toBe(true);
+    expect(c.lecturerApproval?.approved).toBe(true);
+  });
+
   it('a rejection keeps the stage and records the reason', () => {
     const [c] = withRejection([makeCase()], 'C1', 'supervisor', 'Needs references');
     expect(c.approvalStage).toBe('supervisor');

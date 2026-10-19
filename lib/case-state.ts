@@ -52,11 +52,18 @@ function updateCase(cases: CaseRecord[], caseNumber: string, change: (c: CaseRec
 
 // ── Staff-side case updates (see approveCase / rejectCase / revokeApproval) ──
 
+// The Lecturer's final approval of a case the supervisor hasn't approved
+// (it was still at the supervisor stage) records the supervisor approval too.
+export function lecturerSkipsSupervisor(record: CaseRecord | undefined, role: ReviewerRole): boolean {
+  return role === 'lecturer' && !!record && !record.supervisorApproval?.approved;
+}
+
 export function withApproval(cases: CaseRecord[], caseNumber: string, role: ReviewerRole, nextStage: ApprovalStage): CaseRecord[] {
   return updateCase(cases, caseNumber, (c) => ({
     ...c,
     approvalStage: nextStage,
     greenLight: nextStage === 'approved',
+    ...(lecturerSkipsSupervisor(c, role) && { supervisorApproval: { approved: true, approvedAt: new Date() } }),
     [approvalKey(role)]: { approved: true, approvedAt: new Date() },
   }));
 }

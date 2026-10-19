@@ -411,6 +411,14 @@ describe('cases: lecturer review', () => {
     }));
   });
 
+  it('gives final approval to a case still at the supervisor stage', async () => {
+    await assertSucceeds(updateDoc(doc(as('lect'), 'cases/C1'), {
+      supervisorApproval: { approved: true, approvedAt: serverTimestamp() },
+      lecturerApproval: { approved: true, approvedAt: serverTimestamp() }, approvalStage: 'approved', greenLight: true,
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
   it('cannot give the green light before the case is approved', async () => {
     await assertFails(updateDoc(doc(as('lect'), 'cases/C4'), { greenLight: true }));
   });

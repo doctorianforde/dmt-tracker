@@ -34,28 +34,38 @@ describe('CaseTable approval routing', () => {
     expect(screen.getByText('✅ Grant Final Approval')).toBeInTheDocument();
   });
 
-  it('blocks the Lecturer when the assigned supervisor has not approved yet', () => {
-    const rec = makeCase({ supervisorApproval: { approved: false } });
-    render(<CaseTable cases={[rec]} isLecturer />);
+  it('lets the Lecturer grant final approval to a case still at the supervisor stage', () => {
+    const rec = makeCase({ approvalStage: 'supervisor', supervisorUid: 'sup-1', supervisorApproval: undefined });
+    const onApprove = vi.fn();
+    render(<CaseTable cases={[rec]} isLecturer currentUid="lect-1" onApprove={onApprove} />);
 
-    expect(screen.queryByText('✅ Grant Final Approval')).not.toBeInTheDocument();
-    expect(screen.getByText('Waiting for approval')).toBeInTheDocument();
+    expect(screen.queryByText('✅ Approve & Send to Lecturer')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('✅ Grant Final Approval'));
+    expect(onApprove).toHaveBeenCalledWith('DMT-2024-001', 'lecturer', 'approved');
   });
 
-  it('lets a Lecturer who is the student’s chosen supervisor do the supervisor review', () => {
+  it('gives the Lecturer final approval directly on cases where they are the chosen supervisor', () => {
     const rec = makeCase({ approvalStage: 'supervisor', supervisorUid: 'lect-1', supervisorApproval: { approved: false } });
     const onApprove = vi.fn();
     render(<CaseTable cases={[rec]} isLecturer currentUid="lect-1" onApprove={onApprove} />);
 
-    fireEvent.click(screen.getByText('✅ Approve & Send to Lecturer'));
-    expect(onApprove).toHaveBeenCalledWith('DMT-2024-001', 'supervisor', 'lecturer');
+    fireEvent.click(screen.getByText('✅ Grant Final Approval'));
+    expect(onApprove).toHaveBeenCalledWith('DMT-2024-001', 'lecturer', 'approved');
   });
 
-  it('does not let a Lecturer do the supervisor review for someone else’s student', () => {
-    const rec = makeCase({ approvalStage: 'supervisor', supervisorUid: 'sup-1', supervisorApproval: { approved: false } });
-    render(<CaseTable cases={[rec]} isLecturer currentUid="lect-1" />);
+  it('offers no approval on a draft, and says it is a draft', () => {
+    const rec = makeCase({ approvalStage: 'pending', supervisorApproval: undefined });
+    render(<CaseTable cases={[rec]} isLecturer />);
 
-    expect(screen.queryByText('✅ Approve & Send to Lecturer')).not.toBeInTheDocument();
+    expect(screen.queryByText('✅ Grant Final Approval')).not.toBeInTheDocument();
+    expect(screen.getByText('Draft — not submitted yet')).toBeInTheDocument();
+  });
+
+  it('shows no approval once the Lecturer has approved', () => {
+    const rec = makeCase({ approvalStage: 'approved', greenLight: true, lecturerApproval: { approved: true } });
+    render(<CaseTable cases={[rec]} isLecturer />);
+
+    expect(screen.queryByText('✅ Grant Final Approval')).not.toBeInTheDocument();
   });
 
   it('lets the assigned supervisor approve and advance to the Lecturer stage', () => {

@@ -61,26 +61,18 @@ interface Viewer {
 }
 
 // Supervisors only ever load their own students' cases (enforced in
-// firestore.rules); a Lecturer acts at the supervisor stage only on cases
-// where they are the assigned supervisor.
-function actsAsSupervisor(viewer: Viewer, record: CaseRecord): boolean {
-  return viewer.isSupervisor || (!!viewer.uid && record.supervisorUid === viewer.uid);
-}
-
+// firestore.rules), and approve them on to the Lecturer. The Lecturer can
+// give final approval to any submitted case — at the supervisor stage too,
+// which records the supervisor approval along with it (see approveCase).
 function getNextStage(current: ApprovalStage, viewer: Viewer, record: CaseRecord): ApprovalStage | null {
-  if (current === 'supervisor' && actsAsSupervisor(viewer, record) && !record.supervisorApproval?.approved) {
-    return 'lecturer';
-  }
-  if (viewer.isLecturer && current === 'lecturer' && record.supervisorApproval?.approved) {
-    return 'approved';
-  }
+  if (viewer.isLecturer && (current === 'supervisor' || current === 'lecturer')) return 'approved';
+  if (viewer.isSupervisor && current === 'supervisor' && !record.supervisorApproval?.approved) return 'lecturer';
   return null;
 }
 
 export function canApprove(stage: ApprovalStage, viewer: Viewer, record: CaseRecord): boolean {
-  if (stage === 'supervisor' && actsAsSupervisor(viewer, record) && !record.supervisorApproval?.approved) return true;
-  if (viewer.isLecturer && stage === 'lecturer' && !record.lecturerApproval?.approved && record.supervisorApproval?.approved) return true;
-  return false;
+  if (getNextStage(stage, viewer, record) === null) return false;
+  return stage === 'lecturer' ? !record.lecturerApproval?.approved : !record.supervisorApproval?.approved;
 }
 
 
@@ -254,7 +246,7 @@ export default function CaseTable({ cases, isLecturer = false, isSupervisor = fa
                         {canApproveCase && nextStage && rejectingCase !== rec.caseNumber && (
                           <div className="flex flex-col items-center gap-1">
                             <button
-                              onClick={() => run(rec.caseNumber, () => onApprove?.(rec.caseNumber, reviewerRole(stage), nextStage))}
+                              onClick={() => run(rec.caseNumber, () => onApprove?.(rec.caseNumber, nextStage === 'approved' ? 'lecturer' : 'supervisor', nextStage))}
                               disabled={busy}
                               className="btn !px-3 !py-1.5 text-xs bg-ok/15 text-ok hover:bg-ok/25 whitespace-nowrap"
                             >
@@ -292,6 +284,9 @@ export default function CaseTable({ cases, isLecturer = false, isSupervisor = fa
                               </button>
                             </div>
                           </div>
+                        )}
+                        {stage === 'pending' && (
+                          <span className="text-xs text-muted">Draft — not submitted yet</span>
                         )}
                         {!canApproveCase && stage !== 'pending' && stage !== 'approved' && (
                           <span className="text-xs text-muted">Waiting for approval</span>

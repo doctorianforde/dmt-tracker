@@ -31,6 +31,7 @@ import {
   approvedCounts,
   deadlineCounts,
   errorMessage,
+  lecturerSkipsSupervisor,
   stageOf,
   withApproval,
   withCaseSupervisor,
@@ -196,7 +197,8 @@ function Dashboard() {
 
   const handleApprove = (caseNumber: string, role: ReviewerRole, nextStage: ApprovalStage) =>
     attempt('approve this case', async () => {
-      await approveCase(caseNumber, role, nextStage);
+      const record = cases.find((c) => c.caseNumber === caseNumber);
+      await approveCase(caseNumber, role, nextStage, lecturerSkipsSupervisor(record, role));
       setCases((prev) => withApproval(prev, caseNumber, role, nextStage));
       log('approve', caseNumber, caseLabel(caseNumber));
     });
@@ -328,7 +330,7 @@ function Dashboard() {
                 title="Case reviews"
                 description={
                   isLecturer
-                    ? 'Grant final approval once the supervisor has approved. Students who chose you as their supervisor also appear here for the first review.'
+                    ? 'Grant final approval to any submitted case, whether or not its supervisor has reviewed it yet. Drafts appear once the student submits them.'
                     : 'Approve to send a case on to the Lecturer, or request changes.'
                 }
               />

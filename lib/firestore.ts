@@ -203,7 +203,10 @@ export async function resubmitCase(caseNumber: string): Promise<void> {
 export async function approveCase(
   caseNumber: string,
   reviewerRole: 'supervisor' | 'lecturer',
-  nextStage: ApprovalStage
+  nextStage: ApprovalStage,
+  // The Lecturer approving a case still at the supervisor stage signs off
+  // that stage as well.
+  alsoSupervisor = false
 ): Promise<void> {
   const db = getSafeDb();
   const approvalKey = `${reviewerRole}Approval` as const;
@@ -220,6 +223,7 @@ export async function approveCase(
   // Only the Lecturer flips the final green light.
   if (reviewerRole === 'lecturer') {
     updates.greenLight = nextStage === 'approved';
+    if (alsoSupervisor) updates.supervisorApproval = { approved: true, approvedAt: serverTimestamp() };
   }
 
   await updateDoc(doc(db, 'cases', caseNumber), updates);
